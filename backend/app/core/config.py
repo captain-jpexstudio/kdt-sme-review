@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change-me"
     JWT_ACCESS_TTL_MIN: int = 120
     JWT_REFRESH_TTL_DAYS: int = 7
+    # 쿠키 — 로컬(http)은 False, 운영(https)은 True (spec §6: httpOnly·Secure·SameSite)
+    COOKIE_SECURE: bool = False
+    ACCESS_COOKIE: str = "access_token"
+    REFRESH_COOKIE: str = "refresh_token"
 
     # PII / 서명
     PII_FERNET_KEY: str = ""
