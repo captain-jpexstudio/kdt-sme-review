@@ -40,13 +40,19 @@ async def current_reviewer(user: User = Depends(current_user)) -> User:
     return user
 
 
+async def agreed_reviewer(user: User = Depends(current_reviewer)) -> User:
+    if not user.is_agreed:
+        raise HTTPException(403, {"error_code": "NOT_AGREED", "message": "검수 참여 동의가 필요합니다."})
+    return user
+
+
 async def require_admin(user: User = Depends(current_user)) -> User:
     if user.role != "admin":
         raise HTTPException(403, {"error_code": "FORBIDDEN"})
     return user
 
 
-async def ensure_not_locked(user: User = Depends(current_reviewer)) -> User:
+async def ensure_not_locked(user: User = Depends(agreed_reviewer)) -> User:
     """spec §13.4 — 최종 제출 후 편집 차단(423)."""
     if user.is_batch_submitted:
         raise HTTPException(423, {"error_code": "BATCH_LOCKED", "message": "최종 제출 완료로 편집이 잠겼습니다."})

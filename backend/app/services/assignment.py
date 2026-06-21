@@ -4,9 +4,10 @@ import random
 import pandas as pd
 
 ALIASES = {
-    "질문": "question", "q": "question",
-    "정답": "answer", "답변": "answer", "a": "answer",
-    "배정페르소나": "assigned_persona", "persona": "assigned_persona",
+    "질문": "question", "question": "question", "q": "question",
+    "정답": "answer", "답변": "answer", "answer": "answer", "a": "answer",
+    "배정페르소나": "assigned_persona", "assigned_persona": "assigned_persona",
+    "persona": "assigned_persona",
 }
 
 

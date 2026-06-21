@@ -4,10 +4,12 @@
 > 큰 단계 끝낼 때마다 체크박스·현재 위치 한 줄 갱신. 최종 갱신: 2026-06-21.
 
 ## 현재 위치
-**▶ P1 완료 ✅** (백엔드 docker 통합검증 / 프론트 빌드검증). 다음은 P2(코어 BE: 업로드·할당·tasks·ActiveEdit).
+**▶ P2 완료 ✅** (코어 BE: 업로드·할당·tasks·ActiveEdit·audit 구현 및 Docker 스모크 검증). 다음은 P3(워크스페이스 FE).
 - 백엔드: login/me/refresh/logout + 단일세션(SESSION_SUPERSEDED) + 동의게이트(3종)·듀얼서명·증빙PDF(weasyprint)·audit
   - docker 통합검증: 로그인/단일세션/틀린비번/체크누락·blank서명·정상동의·멱등·admin403 + DB(agreement_records·signature_assets·PDF파일) 확인
 - 프론트: /login·/agreement(SignaturePad)·middleware 가드·workspace 미동의 리다이렉트, `next build` 타입체크 통과
+- P2 백엔드: `/admin/datasets/upload` xlsx 업로드·7×300 할당, `/tasks/summary|list|get|autosave|submit`, 동의/잠금/버전충돌/ActiveEdit 가드, audit 기록
+- P2 검증: `compileall` 통과, Docker `api` 기동·라우트 등록 확인, 14건 소량 DB 스모크(업로드→summary/list/get→autosave→submit→409), 2,100건 할당 단위 검증(7명×300)
 - 실검증 중 잡은 버그: passlib↔bcrypt5(→4.0.1 핀), @types/react-signature-canvas 누락
 - **미검증(후속)**: 브라우저 E2E(로그인→서명→제출 클릭 흐름)은 Playwright로 P6에서. web+nginx 합본 기동도 그때.
 
@@ -16,7 +18,7 @@
 |---|---|---|---|
 | **P0** 셋업 | repo·docker·DB·Alembic·시드·파일스토리지 | `compose up` 기동·마이그레이션 통과 | ✅ 검증완료 |
 | **P1** 인증/동의/서명 | login·me·미들웨어·단일세션 + 듀얼 서명 + agreement(서명·PDF) | 미동의→/agreement 강제, 서명 검증·증빙 PDF | ✅ BE검증·FE빌드검증(브라우저E2E는 P6) |
-| **P2** 코어 BE | 업로드/할당·tasks(list/get/autosave/submit)·ActiveEdit·audit | 2,100→7×300, 제출 검증·로그, 단위 green | ⬜ |
+| **P2** 코어 BE | 업로드/할당·tasks(list/get/autosave/submit)·ActiveEdit·audit | 2,100→7×300, 제출 검증·로그, 단위 green | ✅ 구현·스모크검증 완료 |
 | **P3** 워크스페이스 FE | Q-A 목록(검색·필터)·상세 에디터·실시간 검증·autosave·단축키·재수정 | auto-resume·목록↔상세·제출 조건·자동 이동 | ⬜ |
 | **P4** 최종 제출/락킹 | batch eligibility·batch-submit(서명·PDF·잠금)·LockedBanner·423 가드 | 300/300시 모달→잠금→읽기전용, 미완료/재호출 차단 | ⬜ |
 | **P5** 관리자/실시간 | 대시보드·SSE·diff·필터·품질 지표·서명/PDF·unlock·Export·PII 파기 | 제출 즉시 반영·서명 PDF·unlock·파기 | ⬜ |
