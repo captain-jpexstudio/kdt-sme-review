@@ -8,9 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import agreed_reviewer, ensure_not_locked, get_client_ip
 from app.db.base import get_db
-from app.db.models import AuditLog, Dataset, Task, User
+from app.db.models import AuditLog, BatchSubmission, Dataset, Task, User
 from app.schemas.tasks import (
     AutosaveRequest,
+    BatchEligibility,
+    BatchSubmitRequest,
+    BatchSubmitResponse,
     SubmitRequest,
     TaskDetail,
     TaskListItem,
@@ -20,6 +23,10 @@ from app.schemas.tasks import (
     TaskSummary,
 )
 from app.services.active_edit import ActiveEditError, diff_stats, verify_active_edit
+from app.services.events import broadcaster
+from app.services.pdf import render_and_store_pledge_pdf
+from app.services.signature import SignatureError, store_signature
+from app.services.storage import storage
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -169,14 +176,92 @@ async def resume(
     return _detail(task, ds)
 
 
-@router.get("/batch/eligibility")
-async def batch_eligibility():
-    return {"detail": "P4: eligibility"}
+async def _completion_counts(db: AsyncSession, user: User) -> tuple[int, int]:
+    rows = (
+        await db.execute(
+            select(Task.status, func.count())
+            .where(Task.user_id == user.id)
+            .group_by(Task.status)
+        )
+    ).all()
+    counts = {status: count for status, count in rows}
+    total = sum(counts.values())
+    return counts.get("completed", 0), total
 
 
-@router.post("/batch-submit")
-async def batch_submit():
-    return {"detail": "P4: batch-submit"}
+@router.get("/batch/eligibility", response_model=BatchEligibility)
+async def batch_eligibility(
+    user: User = Depends(agreed_reviewer),
+    db: AsyncSession = Depends(get_db),
+):
+    completed, total = await _completion_counts(db, user)
+    return BatchEligibility(
+        completed=completed,
+        total=total,
+        eligible=total > 0 and completed == total and not user.is_batch_submitted,
+        locked=user.is_batch_submitted,
+    )
+
+
+@router.post("/batch-submit", response_model=BatchSubmitResponse)
+async def batch_submit(
+    body: BatchSubmitRequest,
+    request: Request,
+    user: User = Depends(ensure_not_locked),
+    db: AsyncSession = Depends(get_db),
+):
+    completed, total = await _completion_counts(db, user)
+    if total == 0 or completed != total:
+        raise HTTPException(
+            400,
+            {
+                "error_code": "INCOMPLETE_TASKS",
+                "message": "모든 배정 항목을 완료해야 최종 제출할 수 있습니다.",
+                "detail": {"completed": completed, "total": total},
+            },
+        )
+
+    ip = get_client_ip(request)
+    signed_at = datetime.now(timezone.utc)
+    try:
+        asset = await store_signature(db, storage, user.id, "batch", body.typed_name, body.signature_png)
+    except SignatureError as e:
+        raise HTTPException(400, {"error_code": "SIGNATURE_REQUIRED", "message": str(e)})
+
+    pdf_key = await render_and_store_pledge_pdf(
+        storage,
+        user,
+        "batch",
+        asset,
+        ip,
+        typed_name=body.typed_name,
+        signed_at=signed_at,
+        signature_png_url=body.signature_png,
+    )
+    db.add(
+        BatchSubmission(
+            user_id=user.id,
+            typed_name=body.typed_name,
+            signature_asset_id=asset.id,
+            final_pdf_key=pdf_key,
+            completed_count=completed,
+            client_ip=ip,
+            submitted_at=signed_at,
+        )
+    )
+    user.is_batch_submitted = True
+    user.batch_submitted_at = signed_at
+    db.add(
+        AuditLog(
+            user_id=user.id,
+            action_type="BATCH_SUBMIT",
+            details={"completed": completed, "total": total, "final_pdf_key": pdf_key},
+            client_ip=ip,
+        )
+    )
+    await db.commit()
+    await broadcaster.publish({"type": "BATCH_SUBMIT", "reviewer_code": user.reviewer_code, "ts": signed_at.isoformat()})
+    return BatchSubmitResponse(status="locked", completed=completed, final_pdf_key=pdf_key)
 
 
 @router.get("/{task_id}", response_model=TaskDetail)

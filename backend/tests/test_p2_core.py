@@ -1,4 +1,5 @@
 import asyncio
+import base64
 from collections import Counter
 from io import BytesIO
 from types import SimpleNamespace
@@ -6,14 +7,15 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 from fastapi import HTTPException, UploadFile
+from PIL import Image, ImageDraw
 from sqlalchemy import delete, select, text
 
 from app.api.admin import upload_datasets
 from app.api.deps import agreed_reviewer, ensure_not_locked
-from app.api.tasks import autosave, get_task, list_tasks, resume, submit, summary
+from app.api.tasks import autosave, batch_eligibility, batch_submit, get_task, list_tasks, resume, submit, summary
 from app.db.base import SessionLocal, engine
-from app.db.models import AuditLog, Dataset, Task, User
-from app.schemas.tasks import AutosaveRequest, SubmitRequest
+from app.db.models import AuditLog, BatchSubmission, Dataset, SignatureAsset, Task, User
+from app.schemas.tasks import AutosaveRequest, BatchSubmitRequest, SubmitRequest
 from app.seed import seed
 from app.services.assignment import build_assignments
 
@@ -41,6 +43,10 @@ async def cleanup_batch(db):
         ).scalars().all()
         await db.execute(delete(Task).where(Task.dataset_id.in_(dataset_ids)))
         await db.execute(delete(Dataset).where(Dataset.id.in_(dataset_ids)))
+    submissions = (await db.execute(select(BatchSubmission.signature_asset_id))).scalars().all()
+    await db.execute(delete(BatchSubmission))
+    if submissions:
+        await db.execute(delete(SignatureAsset).where(SignatureAsset.id.in_(submissions)))
     await db.execute(
         text("delete from audit_logs where details->>'batch_id' = :batch_id"),
         {"batch_id": BATCH_ID},
@@ -82,6 +88,15 @@ def xlsx_upload(rows: int = 14) -> UploadFile:
     ).to_excel(buf, index=False)
     buf.seek(0)
     return UploadFile(filename="p2.xlsx", file=buf)
+
+
+def signature_png() -> str:
+    img = Image.new("RGBA", (320, 140), "white")
+    draw = ImageDraw.Draw(img)
+    draw.line((30, 90, 120, 40, 220, 88, 290, 54), fill="black", width=4)
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
 
 
 def test_assignment_splits_2100_items_into_7_reviewers():
@@ -280,6 +295,87 @@ def test_p2_reviewer_guards_require_agreement_and_unlocked_account():
             assert locked.value.detail["error_code"] == "BATCH_LOCKED"
 
             reviewer.is_batch_submitted = False
+            await db.commit()
+
+    run(scenario())
+
+
+def test_p4_batch_submit_locks_completed_reviewer_and_blocks_edits():
+    async def scenario():
+        async with SessionLocal() as db:
+            await cleanup_batch(db)
+            admin, reviewer, _ = await users(db)
+            await upload_datasets(
+                file=xlsx_upload(),
+                batch_id=BATCH_ID,
+                per_reviewer=2,
+                admin=admin,
+                db=db,
+            )
+            request = SimpleNamespace(headers={}, client=None)
+
+            incomplete = await batch_eligibility(user=reviewer, db=db)
+            assert incomplete.total == 2
+            assert incomplete.completed == 0
+            assert incomplete.eligible is False
+
+            with pytest.raises(HTTPException) as err:
+                await batch_submit(
+                    body=BatchSubmitRequest(typed_name="홍길동", signature_png=signature_png()),
+                    request=request,
+                    user=reviewer,
+                    db=db,
+                )
+            assert err.value.status_code == 400
+            assert err.value.detail["error_code"] == "INCOMPLETE_TASKS"
+
+            for item in await list_tasks(sort="seq", user=reviewer, db=db):
+                detail = await get_task(task_id=item.task_id, user=reviewer, db=db)
+                await submit(
+                    task_id=item.task_id,
+                    body=SubmitRequest(
+                        version=detail.version,
+                        modified_q=detail.original_q,
+                        modified_a=f"{detail.original_a} 수정",
+                    ),
+                    request=request,
+                    user=reviewer,
+                    db=db,
+                )
+
+            eligible = await batch_eligibility(user=reviewer, db=db)
+            assert eligible.completed == 2
+            assert eligible.eligible is True
+
+            locked = await batch_submit(
+                body=BatchSubmitRequest(typed_name="홍길동", signature_png=signature_png()),
+                request=request,
+                user=reviewer,
+                db=db,
+            )
+            assert locked.status == "locked"
+            assert locked.completed == 2
+            assert locked.final_pdf_key
+            await db.refresh(reviewer)
+            assert reviewer.is_batch_submitted is True
+            assert reviewer.batch_submitted_at is not None
+
+            after = await batch_eligibility(user=reviewer, db=db)
+            assert after.locked is True
+            assert after.eligible is False
+
+            with pytest.raises(HTTPException) as edit:
+                await ensure_not_locked(reviewer)
+            assert edit.value.status_code == 423
+
+            actions = (
+                await db.execute(select(AuditLog.action_type).where(AuditLog.user_id == reviewer.id))
+            ).scalars().all()
+            assert "BATCH_SUBMIT" in actions
+
+            await cleanup_batch(db)
+            reviewer.is_batch_submitted = False
+            reviewer.batch_submitted_at = None
             await db.commit()
 
     run(scenario())

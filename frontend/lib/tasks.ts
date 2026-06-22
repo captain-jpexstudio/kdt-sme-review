@@ -56,6 +56,24 @@ export interface TaskMutationResponse {
   active_edit: Record<string, unknown> | null;
 }
 
+export interface BatchEligibility {
+  completed: number;
+  total: number;
+  eligible: boolean;
+  locked: boolean;
+}
+
+export interface BatchSubmitPayload {
+  typed_name: string;
+  signature_png: string;
+}
+
+export interface BatchSubmitResponse {
+  status: "locked";
+  completed: number;
+  final_pdf_key: string | null;
+}
+
 export interface AutosavePayload {
   version: number;
   draft_q: string | null;
@@ -103,5 +121,15 @@ export async function autosaveTask(taskId: string, payload: AutosavePayload): Pr
 
 export async function submitTask(taskId: string, payload: SubmitPayload): Promise<TaskMutationResponse> {
   const { data } = await api.put<TaskMutationResponse>(`/tasks/${taskId}/submit`, payload);
+  return data;
+}
+
+export async function getBatchEligibility(): Promise<BatchEligibility> {
+  const { data } = await api.get<BatchEligibility>("/tasks/batch/eligibility");
+  return data;
+}
+
+export async function batchSubmit(payload: BatchSubmitPayload): Promise<BatchSubmitResponse> {
+  const { data } = await api.post<BatchSubmitResponse>("/tasks/batch-submit", payload);
   return data;
 }

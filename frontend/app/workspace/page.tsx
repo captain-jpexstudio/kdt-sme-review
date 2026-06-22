@@ -1,14 +1,17 @@
 "use client";
 
 import axios from "axios";
-import { Check, ChevronRight, Edit3, Filter, Loader2, RotateCcw, Save, Search } from "lucide-react";
+import { Check, ChevronRight, Edit3, FileSignature, Filter, Loader2, Lock, RotateCcw, Save, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { evaluateEdit } from "@/lib/activeEdit";
 import { getMe } from "@/lib/auth";
+import { SignaturePad, type SignatureValue } from "@/components/SignaturePad";
 import {
   autosaveTask,
+  batchSubmit,
+  getBatchEligibility,
   getTask,
   getTaskSummary,
   listTasks,
@@ -16,6 +19,7 @@ import {
   submitTask,
   type ErrorReason,
   type ErrorReasonName,
+  type BatchEligibility,
   type TaskDetail,
   type TaskFilter,
   type TaskListItem,
@@ -51,6 +55,11 @@ export default function WorkspacePage() {
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
+  const [eligibility, setEligibility] = useState<BatchEligibility>({ completed: 0, total: 0, eligible: false, locked: false });
+  const [finalOpen, setFinalOpen] = useState(false);
+  const [finalSig, setFinalSig] = useState<SignatureValue | null>(null);
+  const [finalBusy, setFinalBusy] = useState(false);
   const qRef = useRef(qDraft);
   const aRef = useRef(aDraft);
   const reasonsRef = useRef(reasons);
@@ -70,7 +79,10 @@ export default function WorkspacePage() {
   }, [note]);
 
   const loadSummary = useCallback(async () => {
-    setSummary(await getTaskSummary());
+    const [sum, nextEligibility] = await Promise.all([getTaskSummary(), getBatchEligibility()]);
+    setSummary(sum);
+    setEligibility(nextEligibility);
+    setLocked(nextEligibility.locked);
   }, []);
 
   const loadList = useCallback(async () => {
@@ -117,14 +129,18 @@ export default function WorkspacePage() {
           router.replace("/agreement");
           return;
         }
+        setLocked(me.is_batch_submitted);
         setReady(true);
-        const [sum, list, resumed] = await Promise.all([
+        const [sum, list, resumed, nextEligibility] = await Promise.all([
           getTaskSummary(),
           listTasks({ sort }),
           resumeTask(),
+          getBatchEligibility(),
         ]);
         setSummary(sum);
         setItems(list);
+        setEligibility(nextEligibility);
+        setLocked(me.is_batch_submitted || nextEligibility.locked);
         const target = resumed?.task_id ?? currentId ?? list[0]?.task_id;
         if (target) await loadDetail(target);
       })
@@ -149,7 +165,7 @@ export default function WorkspacePage() {
   };
 
   const saveDraft = useCallback(async () => {
-    if (!current || saving) return;
+    if (!current || saving || locked) return;
     setSaving(true);
     setError(null);
     const payload = {
@@ -171,18 +187,18 @@ export default function WorkspacePage() {
     } finally {
       setSaving(false);
     }
-  }, [current, loadList, loadSummary, saving]);
+  }, [current, loadList, loadSummary, locked, saving]);
 
   useEffect(() => {
-    if (!dirty || !current || saving || submitting) return;
+    if (!dirty || !current || saving || submitting || locked) return;
     const t = window.setTimeout(() => {
       saveDraft().catch((e) => setError(errorText(e)));
     }, 1000);
     return () => window.clearTimeout(t);
-  }, [current, dirty, saveDraft, saving, submitting]);
+  }, [current, dirty, locked, saveDraft, saving, submitting]);
 
   const submitCurrent = useCallback(async () => {
-    if (!current || !editStats?.valid || submitting) return;
+    if (!current || !editStats?.valid || submitting || locked) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -210,7 +226,24 @@ export default function WorkspacePage() {
     } finally {
       setSubmitting(false);
     }
-  }, [current, editStats?.valid, filter, loadDetail, query, sort, submitting]);
+  }, [current, editStats?.valid, filter, loadDetail, locked, query, sort, submitting]);
+
+  const submitBatch = useCallback(async () => {
+    if (!finalSig || finalBusy || !eligibility.eligible) return;
+    setFinalBusy(true);
+    setError(null);
+    try {
+      await batchSubmit({ typed_name: finalSig.typedName, signature_png: finalSig.png });
+      setLocked(true);
+      setFinalOpen(false);
+      setDirty(false);
+      await loadSummary();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setFinalBusy(false);
+    }
+  }, [eligibility.eligible, finalBusy, finalSig, loadSummary]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -229,6 +262,7 @@ export default function WorkspacePage() {
   }, [saveDraft, submitCurrent]);
 
   const toggleReason = (reason: ErrorReasonName) => {
+    if (locked) return;
     setReasons((prev) => {
       const exists = prev.some((r) => r.reason === reason);
       if (exists) return prev.filter((r) => r.reason !== reason);
@@ -256,6 +290,11 @@ export default function WorkspacePage() {
         </div>
 
         <div style={progressTrack}><div style={{ ...progressBar, width: `${progress}%` }} /></div>
+        {locked && (
+          <div style={lockedMini}>
+            <Lock size={15} /> 최종 제출 완료
+          </div>
+        )}
 
         <label style={searchBox}>
           <Search size={16} color="#6b7280" />
@@ -300,6 +339,15 @@ export default function WorkspacePage() {
 
       <section style={workspace}>
         {error && <div style={errorBox}>{error}</div>}
+        {locked && (
+          <div style={lockedBanner}>
+            <Lock size={18} />
+            <div>
+              <b>최종 제출이 완료되어 읽기전용으로 잠겼습니다.</b>
+              <div>관리자 해제 전까지 저장과 제출은 차단됩니다.</div>
+            </div>
+          </div>
+        )}
         {!current && !busyDetail && <div style={emptyDetail}>배정된 검수 항목이 없습니다.</div>}
         {busyDetail && <div style={emptyDetail}><Loader2 size={18} /> 불러오는 중</div>}
         {current && !busyDetail && (
@@ -310,10 +358,15 @@ export default function WorkspacePage() {
                 <h2 style={detailTitle}>{current.original_q}</h2>
               </div>
               <div style={actions}>
-                <button onClick={() => saveDraft()} disabled={saving || !dirty} style={secondaryButton}>
+                {eligibility.eligible && !locked && (
+                  <button onClick={() => setFinalOpen(true)} style={primaryButton}>
+                    <FileSignature size={16} /> 최종 제출
+                  </button>
+                )}
+                <button onClick={() => saveDraft()} disabled={saving || !dirty || locked} style={saving || dirty && !locked ? secondaryButton : disabledButton}>
                   {saving ? <Loader2 size={16} /> : <Save size={16} />} 임시저장
                 </button>
-                <button onClick={() => submitCurrent()} disabled={submitting || !editStats?.valid} style={editStats?.valid ? primaryButton : disabledButton}>
+                <button onClick={() => submitCurrent()} disabled={submitting || !editStats?.valid || locked} style={editStats?.valid && !locked ? primaryButton : disabledButton}>
                   {submitting ? <Loader2 size={16} /> : <Check size={16} />} 제출
                 </button>
               </div>
@@ -323,6 +376,7 @@ export default function WorkspacePage() {
               <span>{dirty ? "수정됨" : savedAt ? `${savedAt} 저장됨` : "동기화됨"}</span>
               {editStats && <span>변경 {editStats.changed}단어 · {Math.round(editStats.ratio * 100)}%</span>}
               {editStats?.tier === "trivial" && <span style={warnText}>변경량 낮음</span>}
+              <span>최종 {eligibility.completed}/{eligibility.total}</span>
             </div>
 
             <div style={columns}>
@@ -337,12 +391,14 @@ export default function WorkspacePage() {
                 <textarea
                   value={qDraft}
                   onChange={(e) => { setQDraft(e.target.value); markDirty(); }}
+                  disabled={locked}
                   style={questionArea}
                 />
                 <label style={fieldLabel}>수정 정답</label>
                 <textarea
                   value={aDraft}
                   onChange={(e) => { setADraft(e.target.value); markDirty(); }}
+                  disabled={locked}
                   style={answerArea}
                 />
                 <div style={reasonGrid}>
@@ -350,7 +406,7 @@ export default function WorkspacePage() {
                     const checked = reasons.some((r) => r.reason === reason);
                     return (
                       <label key={reason} style={checked ? reasonOn : reasonOff}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleReason(reason)} />
+                        <input type="checkbox" checked={checked} disabled={locked} onChange={() => toggleReason(reason)} />
                         <span>{reason}</span>
                       </label>
                     );
@@ -359,6 +415,7 @@ export default function WorkspacePage() {
                 <textarea
                   value={note}
                   onChange={(e) => { setNote(e.target.value); markDirty(); }}
+                  disabled={locked}
                   placeholder="메모"
                   style={noteArea}
                 />
@@ -367,6 +424,30 @@ export default function WorkspacePage() {
           </>
         )}
       </section>
+      {finalOpen && (
+        <div style={modalBackdrop}>
+          <div style={modal}>
+            <div style={modalHeader}>
+              <div>
+                <div style={eyebrow}>최종 제출</div>
+                <h2 style={modalTitle}>저작권 이관 및 검수 완료 서명</h2>
+              </div>
+              <button onClick={() => setFinalOpen(false)} style={iconButton}>×</button>
+            </div>
+            <p style={modalCopy}>
+              완료된 {eligibility.completed}개 항목을 최종 제출합니다. 제출 후 전체 워크스페이스는 읽기전용으로 잠기며,
+              최종 제출 시각이 정산 기준으로 기록됩니다.
+            </p>
+            <SignaturePad onChange={setFinalSig} />
+            <div style={modalActions}>
+              <button onClick={() => setFinalOpen(false)} style={secondaryButton}>취소</button>
+              <button onClick={() => submitBatch()} disabled={!finalSig || finalBusy} style={finalSig && !finalBusy ? primaryButton : disabledButton}>
+                {finalBusy ? <Loader2 size={16} /> : <FileSignature size={16} />} 서명하고 잠금
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -388,6 +469,8 @@ function errorText(e: unknown) {
     if (detail?.error_code === "VERSION_CONFLICT") return "다른 저장 내용이 있습니다. 새로고침 후 다시 시도하세요.";
     if (detail?.error_code === "ACTIVE_EDIT_REQUIRED") return "정답을 최소 1단어 이상 수정해야 제출할 수 있습니다.";
     if (detail?.error_code === "BATCH_LOCKED") return "최종 제출 완료로 편집이 잠겼습니다.";
+    if (detail?.error_code === "INCOMPLETE_TASKS") return "모든 항목을 완료해야 최종 제출할 수 있습니다.";
+    if (detail?.error_code === "SIGNATURE_REQUIRED") return "성명과 서명을 모두 입력해 주세요.";
   }
   return "요청 처리에 실패했습니다.";
 }
@@ -401,6 +484,7 @@ const title: React.CSSProperties = { fontSize: 24, lineHeight: 1.1, margin: 0 };
 const iconButton: React.CSSProperties = { width: 34, height: 34, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid #cfd3ca", borderRadius: 6, background: "#fff", cursor: "pointer" };
 const progressTrack: React.CSSProperties = { height: 7, borderRadius: 999, background: "#e5e7df", overflow: "hidden" };
 const progressBar: React.CSSProperties = { height: "100%", background: "#1d6f61", transition: "width 180ms ease" };
+const lockedMini: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, border: "1px solid #d8caa6", background: "#fff8e6", color: "#765616", borderRadius: 6, padding: "8px 10px", fontSize: 13 };
 const searchBox: React.CSSProperties = { height: 36, display: "flex", alignItems: "center", gap: 8, border: "1px solid #cfd3ca", borderRadius: 6, background: "#fff", padding: "0 9px" };
 const searchInput: React.CSSProperties = { border: 0, outline: 0, background: "transparent", width: "100%", fontSize: 14 };
 const chipRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 };
@@ -418,6 +502,7 @@ const mutedLine: React.CSSProperties = { display: "flex", alignItems: "center", 
 const empty: React.CSSProperties = { color: "#6b7280", fontSize: 13, padding: 10 };
 const workspace: React.CSSProperties = { padding: 24, minWidth: 0 };
 const errorBox: React.CSSProperties = { border: "1px solid #e2a4a4", background: "#fff1f1", color: "#9f2222", borderRadius: 6, padding: "10px 12px", marginBottom: 12, fontSize: 13 };
+const lockedBanner: React.CSSProperties = { display: "flex", alignItems: "flex-start", gap: 10, border: "1px solid #d8caa6", background: "#fff8e6", color: "#765616", borderRadius: 6, padding: "11px 12px", marginBottom: 12, fontSize: 13 };
 const emptyDetail: React.CSSProperties = { height: "calc(100vh - 48px)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#6b7280" };
 const detailHeader: React.CSSProperties = { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 10 };
 const detailTitle: React.CSSProperties = { fontSize: 22, lineHeight: 1.35, margin: 0, maxWidth: 880 };
@@ -439,3 +524,9 @@ const reasonGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: 
 const reasonOff: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, minHeight: 31, border: "1px solid #cfd3ca", borderRadius: 6, padding: "5px 8px", background: "#fff", fontSize: 13 };
 const reasonOn: React.CSSProperties = { ...reasonOff, borderColor: "#1d6f61", background: "#e7f2ef", color: "#145348" };
 const noteArea: React.CSSProperties = { minHeight: 64, resize: "vertical", border: "1px solid #cfd3ca", borderRadius: 6, padding: 10, font: "inherit", lineHeight: 1.5 };
+const modalBackdrop: React.CSSProperties = { position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(17,24,39,0.36)", padding: 20, zIndex: 30 };
+const modal: React.CSSProperties = { width: "min(560px, 100%)", borderRadius: 8, background: "#fff", boxShadow: "0 24px 80px rgba(0,0,0,0.22)", padding: 20 };
+const modalHeader: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start" };
+const modalTitle: React.CSSProperties = { fontSize: 20, margin: 0 };
+const modalCopy: React.CSSProperties = { color: "#4b5563", lineHeight: 1.55, fontSize: 14 };
+const modalActions: React.CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 };

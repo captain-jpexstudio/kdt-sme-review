@@ -75,6 +75,24 @@ class TaskMutationResponse(BaseModel):
     active_edit: dict[str, Any] | None = None
 
 
+class BatchEligibility(BaseModel):
+    completed: int
+    total: int
+    eligible: bool
+    locked: bool
+
+
+class BatchSubmitRequest(BaseModel):
+    typed_name: str
+    signature_png: str
+
+
+class BatchSubmitResponse(BaseModel):
+    status: Literal["locked"]
+    completed: int
+    final_pdf_key: str | None = None
+
+
 class DatasetUploadResponse(BaseModel):
     batch_id: str
     datasets: int
