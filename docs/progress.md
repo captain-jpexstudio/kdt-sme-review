@@ -9,7 +9,7 @@
   - docker 통합검증: 로그인/단일세션/틀린비번/체크누락·blank서명·정상동의·멱등·admin403 + DB(agreement_records·signature_assets·PDF파일) 확인
 - 프론트: /login·/agreement(SignaturePad)·middleware 가드·workspace 미동의 리다이렉트, `next build` 타입체크 통과
 - P2 백엔드: `/admin/datasets/upload` xlsx 업로드·7×300 할당, `/tasks/summary|list|get|autosave|submit`, 동의/잠금/버전충돌/ActiveEdit 가드, audit 기록
-- P2 검증: `compileall` 통과, Docker `api` 기동·라우트 등록 확인, 14건 소량 DB 스모크(업로드→summary/list/get→autosave→submit→409), 2,100건 할당 단위 검증(7명×300)
+- P2 검증: `compileall` 통과, Docker `api` 기동·라우트 등록 확인, `pytest tests/test_p2_core.py` 4개 통과(업로드/할당·tasks·ActiveEdit·version/guard), 2,100건 할당 단위 검증(7명×300)
 - 실검증 중 잡은 버그: passlib↔bcrypt5(→4.0.1 핀), @types/react-signature-canvas 누락
 - **미검증(후속)**: 브라우저 E2E(로그인→서명→제출 클릭 흐름)은 Playwright로 P6에서. web+nginx 합본 기동도 그때.
 
