@@ -11,6 +11,10 @@ from PIL import Image, ImageDraw
 from sqlalchemy import delete, select, text
 
 from app.api.admin import upload_datasets
+from app.api.admin import export as admin_export
+from app.api.admin import reviewers as admin_reviewers
+from app.api.admin import stats as admin_stats
+from app.api.admin import unlock_user
 from app.api.deps import agreed_reviewer, ensure_not_locked
 from app.api.tasks import autosave, batch_eligibility, batch_submit, get_task, list_tasks, resume, submit, summary
 from app.db.base import SessionLocal, engine
@@ -376,6 +380,65 @@ def test_p4_batch_submit_locks_completed_reviewer_and_blocks_edits():
             await cleanup_batch(db)
             reviewer.is_batch_submitted = False
             reviewer.batch_submitted_at = None
+            await db.commit()
+
+    run(scenario())
+
+
+def test_p5_admin_stats_reviewers_export_and_unlock():
+    async def scenario():
+        async with SessionLocal() as db:
+            await cleanup_batch(db)
+            admin, reviewer, _ = await users(db)
+            await upload_datasets(
+                file=xlsx_upload(),
+                batch_id=BATCH_ID,
+                per_reviewer=2,
+                admin=admin,
+                db=db,
+            )
+            request = SimpleNamespace(headers={}, client=None)
+            item = (await list_tasks(sort="seq", user=reviewer, db=db))[0]
+            detail = await get_task(task_id=item.task_id, user=reviewer, db=db)
+            await submit(
+                task_id=item.task_id,
+                body=SubmitRequest(
+                    version=detail.version,
+                    modified_q=detail.original_q,
+                    modified_a=f"{detail.original_a} 수정",
+                ),
+                request=request,
+                user=reviewer,
+                db=db,
+            )
+
+            s = await admin_stats(admin=admin, db=db)
+            assert s.reviewers == 7
+            assert s.total_tasks >= 14
+            assert s.completed >= 1
+
+            rows = await admin_reviewers(admin=admin, db=db)
+            mine = next(r for r in rows if r.user_id == reviewer.id)
+            assert mine.total == 2
+            assert mine.completed == 1
+            assert mine.avg_change_ratio is not None
+
+            response = await admin_export(batch_id=BATCH_ID, admin=admin, db=db)
+            assert response.media_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            payload = b"".join([chunk async for chunk in response.body_iterator])
+            assert len(payload) > 100
+            exported = pd.read_excel(BytesIO(payload))
+            assert len(exported) == 1
+            assert exported.loc[0, "reviewer_code"] == reviewer.reviewer_code
+
+            reviewer.is_batch_submitted = True
+            await db.commit()
+            result = await unlock_user(user_id=reviewer.id, admin=admin, db=db)
+            assert result == {"status": "unlocked"}
+            await db.refresh(reviewer)
+            assert reviewer.is_batch_submitted is False
+
+            await cleanup_batch(db)
             await db.commit()
 
     run(scenario())

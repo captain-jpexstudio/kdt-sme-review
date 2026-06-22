@@ -304,6 +304,7 @@ async def autosave(
         )
     )
     await db.commit()
+    await broadcaster.publish({"type": "AUTOSAVE", "reviewer_code": user.reviewer_code, "task_id": str(task.id), "ts": task.last_accessed_at.isoformat()})
     return TaskMutationResponse(task_id=task.id, status=task.status, version=task.version)
 
 
@@ -344,6 +345,7 @@ async def submit(
         )
     )
     await db.commit()
+    await broadcaster.publish({"type": "SUBMIT", "reviewer_code": user.reviewer_code, "task_id": str(task.id), "ts": task.submitted_at.isoformat()})
     return TaskMutationResponse(
         task_id=task.id,
         status=task.status,
