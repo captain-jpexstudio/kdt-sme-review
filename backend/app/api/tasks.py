@@ -142,9 +142,31 @@ async def list_tasks(
     return items
 
 
-@router.get("/resume")
-async def resume():
-    return {"detail": "P3: resume"}
+@router.get("/resume", response_model=TaskDetail | None)
+async def resume(
+    user: User = Depends(agreed_reviewer),
+    db: AsyncSession = Depends(get_db),
+):
+    row = (
+        await db.execute(
+            select(Task, Dataset)
+            .join(Dataset, Dataset.id == Task.dataset_id)
+            .where(Task.user_id == user.id)
+            .order_by(
+                Task.last_accessed_at.desc().nullslast(),
+                case((Task.status == "pending", 0), else_=1),
+                Task.dataset_id,
+            )
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        return None
+    task, ds = row[0], row[1]
+    task.last_accessed_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(task)
+    return _detail(task, ds)
 
 
 @router.get("/batch/eligibility")
@@ -185,7 +207,7 @@ async def autosave(
     task.error_reasons = [r.model_dump() for r in body.error_reasons]
     task.error_note = body.error_note
     task.last_accessed_at = datetime.now(timezone.utc)
-    if task.status == "pending":
+    if task.status in ("pending", "completed"):
         task.status = "in_progress"
     task.version += 1
     db.add(

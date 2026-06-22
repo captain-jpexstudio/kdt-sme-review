@@ -10,7 +10,7 @@ from sqlalchemy import delete, select, text
 
 from app.api.admin import upload_datasets
 from app.api.deps import agreed_reviewer, ensure_not_locked
-from app.api.tasks import autosave, get_task, list_tasks, submit, summary
+from app.api.tasks import autosave, get_task, list_tasks, resume, submit, summary
 from app.db.base import SessionLocal, engine
 from app.db.models import AuditLog, Dataset, Task, User
 from app.schemas.tasks import AutosaveRequest, SubmitRequest
@@ -165,6 +165,23 @@ def test_p2_upload_task_flow_active_edit_and_version_conflict():
             assert completed.status == "completed"
             assert completed.version == saved.version + 1
             assert completed.suspicious is False
+
+            resumed = await resume(user=reviewer, db=db)
+            assert resumed is not None
+            assert resumed.task_id == items[0].task_id
+
+            re_edit = await autosave(
+                task_id=items[0].task_id,
+                body=AutosaveRequest(
+                    version=completed.version,
+                    draft_q=detail.original_q,
+                    draft_a=f"{detail.original_a} 재수정",
+                ),
+                request=request,
+                user=reviewer,
+                db=db,
+            )
+            assert re_edit.status == "in_progress"
 
             with pytest.raises(HTTPException) as stale:
                 await submit(

@@ -5,6 +5,7 @@ interface TaskState {
   currentId: string | null;
   filter: "all" | "pending" | "in_progress" | "completed";
   query: string;
+  sort: "seq" | "status" | "recent";
   set: (s: Partial<TaskState>) => void;
 }
 
@@ -12,5 +13,6 @@ export const useTaskStore = create<TaskState>((set) => ({
   currentId: null,
   filter: "all",
   query: "",
+  sort: "seq",
   set: (s) => set(s),
 }));
