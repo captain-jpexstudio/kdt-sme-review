@@ -4,6 +4,10 @@
   코드는 이 문서를 따른다. PRD + Technical Spec(구현 착수용).
   - 원본 위치: `defense-dataset-platform/_docs/specs/SME-REVIEW/SurveyWeb_통합_기획개발_설계서_v6.md`
   - v2~v5 및 옛 설계(`research/검수 앱 상세 설계_윤지수.md`)를 **통합·대체**한다.
+- **`architecture.md`** — 코드 실측 기준 아키텍처(구성도·컴포넌트·API 표면·인증/가드·데이터모델·SSE/스토리지).
+- **`business-logic.md`** — 비즈니스 규칙(BR)·상태머신·Active Edit/서명/락킹·불변식·임계값·에러코드.
+- **`deploy-options.md`** — 배포 옵션 비교(AWS+Terraform vs 우분투+Tailscale). 결정 대기.
+- **`progress.md`** — 구현 진행현황(P0~P6).
 
 ## 옛 설계 대비 주요 변경 (착수 전 인지)
 - **스택 확정**: Next.js 14 + FastAPI + Postgres + Nginx/Docker(자체호스팅, Vercel 아님).
