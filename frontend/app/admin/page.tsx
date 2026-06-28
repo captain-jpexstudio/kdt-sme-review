@@ -1,10 +1,22 @@
 "use client";
 
-import { Download, LockOpen, RefreshCw, Radio } from "lucide-react";
+import { Download, FileText, FileCheck, LockOpen, PenLine, RefreshCw, Radio } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { exportUrl, getAdminStats, getReviewers, unlockReviewer, type AdminStats, type ReviewerProgress } from "@/lib/admin";
+import {
+  agreementPdfUrl,
+  exportUrl,
+  finalPdfUrl,
+  getAdminStats,
+  getReviewers,
+  getReviewerSignatures,
+  signatureImageUrl,
+  unlockReviewer,
+  type AdminStats,
+  type ReviewerProgress,
+  type SignatureInfo,
+} from "@/lib/admin";
 import { getMe } from "@/lib/auth";
 
 interface LiveEvent {
@@ -22,6 +34,9 @@ export default function AdminPage() {
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [batchId, setBatchId] = useState("");
+  const [sigOpen, setSigOpen] = useState<string | null>(null);
+  const [sigs, setSigs] = useState<Record<string, SignatureInfo[]>>({});
 
   const refresh = useCallback(async () => {
     const [s, r] = await Promise.all([getAdminStats(), getReviewers()]);
@@ -71,6 +86,22 @@ export default function AdminPage() {
     }
   };
 
+  const toggleSignatures = async (r: ReviewerProgress) => {
+    if (sigOpen === r.user_id) {
+      setSigOpen(null);
+      return;
+    }
+    setSigOpen(r.user_id);
+    if (!sigs[r.user_id]) {
+      try {
+        const list = await getReviewerSignatures(r.user_id);
+        setSigs((prev) => ({ ...prev, [r.user_id]: list }));
+      } catch {
+        setError("서명 증빙을 불러오지 못했습니다.");
+      }
+    }
+  };
+
   if (!ready || !stats) return <main style={loading}>확인 중…</main>;
 
   return (
@@ -81,7 +112,15 @@ export default function AdminPage() {
           <h1 style={title}>전체 {stats.completed} / {stats.total_tasks}</h1>
         </div>
         <div style={actions}>
-          <a href={exportUrl()} style={primaryButton}><Download size={16} /> Export</a>
+          <input
+            value={batchId}
+            onChange={(e) => setBatchId(e.target.value)}
+            placeholder="batch_id (선택)"
+            style={batchInput}
+          />
+          <a href={exportUrl(batchId.trim() || undefined)} style={primaryButton}>
+            <Download size={16} /> Export{batchId.trim() ? ` (${batchId.trim()})` : ""}
+          </a>
           <button onClick={() => refresh()} style={secondaryButton}><RefreshCw size={16} /> 새로고침</button>
         </div>
       </header>
@@ -102,20 +141,56 @@ export default function AdminPage() {
         </div>
         <div style={reviewerList}>
           {reviewers.map((r) => (
-            <div key={r.user_id} style={reviewerRow}>
-              <div style={reviewerMeta}>
-                <b>{r.reviewer_code ?? r.username}</b>
-                <span>{r.completed}/{r.total} · 작업중 {r.in_progress} · 대기 {r.pending}</span>
+            <div key={r.user_id} style={reviewerBlock}>
+              <div style={reviewerRow}>
+                <div style={reviewerMeta}>
+                  <b>{r.reviewer_code ?? r.username}</b>
+                  <span>{r.completed}/{r.total} · 작업중 {r.in_progress} · 대기 {r.pending}</span>
+                </div>
+                <div style={barTrack}><div style={{ ...barFill, width: `${r.progress_pct}%` }} /></div>
+                <div style={quality}>
+                  <span>평균 변경률 {r.avg_change_ratio == null ? "-" : `${Math.round(r.avg_change_ratio * 100)}%`}</span>
+                  <span>의심 {r.trivial_count}</span>
+                  <span>{r.locked ? "잠김" : "진행"}</span>
+                </div>
+                <div style={rowActions}>
+                  <a href={agreementPdfUrl(r.user_id)} target="_blank" rel="noreferrer" style={linkButton}>
+                    <FileText size={14} /> 동의서
+                  </a>
+                  <a
+                    href={r.batch_submitted_at ? finalPdfUrl(r.user_id) : undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={r.batch_submitted_at ? linkButton : disabledLink}
+                    aria-disabled={!r.batch_submitted_at}
+                    onClick={(e) => { if (!r.batch_submitted_at) e.preventDefault(); }}
+                  >
+                    <FileCheck size={14} /> 최종본
+                  </a>
+                  <button onClick={() => toggleSignatures(r)} style={sigOpen === r.user_id ? ghostButtonOn : ghostButton}>
+                    <PenLine size={14} /> 서명
+                  </button>
+                  <button onClick={() => unlock(r)} disabled={!r.locked} style={r.locked ? unlockButton : disabledButton}>
+                    <LockOpen size={15} /> Unlock
+                  </button>
+                </div>
               </div>
-              <div style={barTrack}><div style={{ ...barFill, width: `${r.progress_pct}%` }} /></div>
-              <div style={quality}>
-                <span>평균 변경률 {r.avg_change_ratio == null ? "-" : `${Math.round(r.avg_change_ratio * 100)}%`}</span>
-                <span>의심 {r.trivial_count}</span>
-                <span>{r.locked ? "잠김" : "진행"}</span>
-              </div>
-              <button onClick={() => unlock(r)} disabled={!r.locked} style={r.locked ? unlockButton : disabledButton}>
-                <LockOpen size={15} /> Unlock
-              </button>
+              {sigOpen === r.user_id && (
+                <div style={sigPanel}>
+                  {(sigs[r.user_id] ?? []).length === 0 && <div style={empty}>서명 증빙이 없습니다.</div>}
+                  {(sigs[r.user_id] ?? []).map((s) => (
+                    <figure key={s.id} style={sigFigure}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={signatureImageUrl(s.id)} alt={`${s.kind} 서명`} style={sigImg} />
+                      <figcaption style={sigCaption}>
+                        <b>{s.kind === "agreement" ? "동의·보안서약" : "최종제출·이관"}</b>
+                        <span>{new Date(s.created_at).toLocaleString("ko-KR")}</span>
+                        <span style={sigHash}>sha256 {s.sha256.slice(0, 12)}…</span>
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -163,7 +238,19 @@ const panelTitle: React.CSSProperties = { margin: "0 0 12px", fontSize: 18 };
 const liveOn: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, color: "#0f766e", fontSize: 13 };
 const liveOff: React.CSSProperties = { ...liveOn, color: "#9ca3af" };
 const reviewerList: React.CSSProperties = { display: "grid", gap: 8 };
-const reviewerRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "180px minmax(160px,1fr) 260px 100px", gap: 12, alignItems: "center", borderTop: "1px solid #eef0ea", padding: "10px 0" };
+const reviewerBlock: React.CSSProperties = { borderTop: "1px solid #eef0ea" };
+const reviewerRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "170px minmax(140px,1fr) 220px auto", gap: 12, alignItems: "center", padding: "10px 0" };
+const rowActions: React.CSSProperties = { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" };
+const linkButton: React.CSSProperties = { height: 30, display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #cfd3ca", borderRadius: 6, background: "#fff", color: "#374151", padding: "0 9px", fontSize: 12, textDecoration: "none", cursor: "pointer" };
+const disabledLink: React.CSSProperties = { ...linkButton, borderColor: "#e5e7eb", color: "#b6bac1", background: "#f7f8f5", cursor: "not-allowed" };
+const ghostButton: React.CSSProperties = { ...linkButton };
+const ghostButtonOn: React.CSSProperties = { ...linkButton, borderColor: "#1d6f61", color: "#1d6f61", background: "#eef6f3" };
+const sigPanel: React.CSSProperties = { display: "flex", gap: 14, flexWrap: "wrap", padding: "4px 0 14px" };
+const sigFigure: React.CSSProperties = { margin: 0, border: "1px solid #e5e7df", borderRadius: 6, padding: 8, background: "#fafbf8" };
+const sigImg: React.CSSProperties = { display: "block", width: 220, height: 100, objectFit: "contain", background: "#fff", border: "1px solid #eef0ea", borderRadius: 4 };
+const sigCaption: React.CSSProperties = { display: "grid", gap: 2, marginTop: 6, fontSize: 12, color: "#374151" };
+const sigHash: React.CSSProperties = { fontFamily: "monospace", fontSize: 10, color: "#9ca3af" };
+const batchInput: React.CSSProperties = { height: 36, border: "1px solid #cfd3ca", borderRadius: 6, padding: "0 10px", fontSize: 13, width: 150 };
 const reviewerMeta: React.CSSProperties = { display: "grid", gap: 3, fontSize: 13 };
 const barTrack: React.CSSProperties = { height: 9, borderRadius: 999, background: "#e5e7df", overflow: "hidden" };
 const barFill: React.CSSProperties = { height: "100%", background: "#1d6f61" };
