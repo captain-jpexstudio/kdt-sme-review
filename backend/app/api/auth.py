@@ -15,7 +15,7 @@ from app.services.pdf import PLEDGE_SHA256, render_and_store_pledge_pdf
 from app.services.signature import SignatureError, store_signature
 from app.services.storage import storage
 
-REQUIRED_CONSENTS = ("security_copyright", "privacy", "tax")
+REQUIRED_CONSENTS = ("security", "ip_rights", "privacy", "tax")
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -84,7 +84,7 @@ async def agreement(
     if user.is_agreed:
         return {"status": "already_agreed"}
     if not all(body.checkbox_states.get(k) is True for k in REQUIRED_CONSENTS):
-        raise HTTPException(400, {"error_code": "NOT_AGREED", "message": "필수 동의 3종을 모두 체크해야 합니다."})
+        raise HTTPException(400, {"error_code": "NOT_AGREED", "message": "필수 동의 4종을 모두 체크해야 합니다."})
 
     ip = get_client_ip(request)
     signed_at = datetime.now(timezone.utc)

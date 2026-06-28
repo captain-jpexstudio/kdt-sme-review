@@ -17,4 +17,4 @@ class AgreementRequest(BaseModel):
     """spec §6 동의 게이트 + 듀얼 서명."""
     typed_name: str
     signature_png: str  # data:image/png;base64,...
-    checkbox_states: dict  # {security_copyright,privacy,tax: bool}
+    checkbox_states: dict  # {security, ip_rights, privacy, tax: bool}

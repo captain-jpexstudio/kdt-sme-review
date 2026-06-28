@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # PII / 서명
     PII_FERNET_KEY: str = ""
     SIGNATURE_STORAGE: str = "/data/signatures"
-    AGREEMENT_VERSION: str = "2026-06-19.v1"
+    AGREEMENT_VERSION: str = "2026-06-29.v2"
 
     # Active Edit 임계 (spec §4.4 / §7.4)
     MIN_WORD_CHANGES: int = 1
