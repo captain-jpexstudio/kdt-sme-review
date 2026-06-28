@@ -1,8 +1,9 @@
 FROM python:3.11-slim
 
-# weasyprint(증빙 PDF) 런타임 의존성
+# weasyprint(증빙 PDF) 런타임 의존성 + 한글 폰트(Noto Sans CJK KR — pdf.py CSS가 지정)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev libcairo2 \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
