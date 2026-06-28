@@ -276,6 +276,18 @@ async def signatures(
     ).scalars().all()
 
 
+@router.get("/signatures/{asset_id}/image")
+async def signature_image(
+    asset_id: int,
+    admin: User = Depends(require_admin),  # noqa: ARG001
+    db: AsyncSession = Depends(get_db),
+):
+    asset = await db.get(SignatureAsset, asset_id)
+    if asset is None:
+        raise HTTPException(404, {"error_code": "NOT_FOUND"})
+    return Response(await storage.get(asset.storage_key), media_type=asset.mime or "image/png")
+
+
 @router.get("/users/{user_id}/agreement.pdf")
 async def agreement_pdf(
     user_id: uuid.UUID,
