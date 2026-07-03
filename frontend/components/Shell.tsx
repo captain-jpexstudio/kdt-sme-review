@@ -17,8 +17,8 @@ const NAV: Record<"reviewer" | "admin", Item[]> = {
   ],
   admin: [
     { key: "dashboard", label: "대시보드", href: "/admin", icon: LayoutDashboard },
-    { key: "reviewers", label: "검수자 진행률", anchor: "reviewers", icon: Users },
-    { key: "events", label: "실시간 이벤트", anchor: "events", icon: Activity },
+    { key: "reviewers", label: "검수자 진행률", href: "/admin/reviewers", icon: Users },
+    { key: "events", label: "실시간 이벤트", href: "/admin/events", icon: Activity },
     { key: "export", label: "내보내기", icon: Download, soon: true },
     { key: "settings", label: "설정", icon: Settings, soon: true },
   ],
@@ -80,7 +80,7 @@ export function Shell({
               </button>
             );
           }
-          const active = pathname?.startsWith(it.href!);
+          const active = it.href === "/admin" ? pathname === "/admin" : pathname?.startsWith(it.href!);
           return (
             <a key={it.key} href={it.href} style={active ? navItemOn : navItem} onClick={() => setDrawer(false)}>
               {inner}
