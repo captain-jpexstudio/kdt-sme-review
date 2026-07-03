@@ -1,0 +1,167 @@
+"use client";
+import { Activity, BookOpen, ClipboardCheck, Download, HelpCircle, History, LayoutDashboard, LogOut, Menu, Settings, Users, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
+
+import { api } from "@/lib/api";
+import { Logo } from "@/components/Logo";
+import { useIsMobile } from "@/lib/useIsMobile";
+import { c, radius, shadow } from "@/lib/theme";
+
+type Item = { key: string; label: string; icon: typeof LayoutDashboard; href?: string; anchor?: string; soon?: boolean };
+
+const NAV: Record<"reviewer" | "admin", Item[]> = {
+  reviewer: [
+    { key: "workspace", label: "검수 워크스페이스", href: "/workspace", icon: ClipboardCheck },
+    { key: "history", label: "내 검수 이력", icon: History, soon: true },
+    { key: "guide", label: "검수 가이드", icon: BookOpen, soon: true },
+  ],
+  admin: [
+    { key: "dashboard", label: "대시보드", href: "/admin", icon: LayoutDashboard },
+    { key: "reviewers", label: "검수자 진행률", anchor: "reviewers", icon: Users },
+    { key: "events", label: "실시간 이벤트", anchor: "events", icon: Activity },
+    { key: "export", label: "내보내기", icon: Download, soon: true },
+    { key: "settings", label: "설정", icon: Settings, soon: true },
+  ],
+};
+
+// 공용 앱 셸 — 다크 좌측 네비 레일 + 화이트 콘텐츠(+상단 헤더). Asana 참조.
+export function Shell({
+  role,
+  title,
+  right,
+  bare,
+  children,
+}: {
+  role: "reviewer" | "admin";
+  title?: string;
+  right?: ReactNode;
+  bare?: boolean;
+  children: ReactNode;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const isMobile = useIsMobile();
+  const [drawer, setDrawer] = useState(false);
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      /* 무시 */
+    }
+    router.replace("/login");
+  };
+
+  const railInner = (
+    <>
+      <div style={brand}>
+        <Logo size={28} />
+        <span style={wordmark}>Survey Web</span>
+        {isMobile && (
+          <button aria-label="닫기" onClick={() => setDrawer(false)} style={drawerClose}><X size={18} /></button>
+        )}
+      </div>
+      <nav style={navList}>
+        <div style={navSection}>{role === "admin" ? "관리" : "검수"}</div>
+        {NAV[role].map((it) => {
+          const Icon = it.icon;
+          const inner = (
+            <span style={navLabel}>
+              <Icon size={17} /> {it.label}
+            </span>
+          );
+          if (it.soon) {
+            return (
+              <div key={it.key} style={navItemSoon} title="준비 중">
+                {inner}
+                <span style={soonChip}>준비중</span>
+              </div>
+            );
+          }
+          if (it.anchor) {
+            return (
+              <button key={it.key} style={navItem} onClick={() => { document.getElementById(it.anchor!)?.scrollIntoView({ behavior: "smooth", block: "start" }); setDrawer(false); }}>
+                {inner}
+              </button>
+            );
+          }
+          const active = pathname?.startsWith(it.href!);
+          return (
+            <a key={it.key} href={it.href} style={active ? navItemOn : navItem} onClick={() => setDrawer(false)}>
+              {inner}
+            </a>
+          );
+        })}
+      </nav>
+      <div style={railFoot}>
+        <button style={navItem} onClick={() => {}}>
+          <span style={navLabel}><HelpCircle size={17} /> 도움말</span>
+        </button>
+        <button style={navItem} onClick={logout}>
+          <span style={navLabel}><LogOut size={17} /> 로그아웃</span>
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div style={isMobile ? rootMobile : root}>
+      {isMobile ? (
+        <>
+          <header style={mTopbar}>
+            <button aria-label="메뉴" onClick={() => setDrawer(true)} style={burger}><Menu size={20} /></button>
+            <Logo size={24} />
+            <span style={wordmarkDark}>Survey Web</span>
+          </header>
+          {drawer && (
+            <>
+              <div style={backdrop} onClick={() => setDrawer(false)} />
+              <aside style={railDrawer}>{railInner}</aside>
+            </>
+          )}
+        </>
+      ) : (
+        <aside style={rail}>{railInner}</aside>
+      )}
+
+      <div style={main}>
+        {title !== undefined && (
+          <header style={isMobile ? topbarMobile : topbar}>
+            <div style={crumb}>{title}</div>
+            {right && <div style={topRight}>{right}</div>}
+          </header>
+        )}
+        <div style={bare ? bareContent : (isMobile ? contentMobile : content)}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+const root: React.CSSProperties = { minHeight: "100vh", display: "grid", gridTemplateColumns: "236px minmax(0, 1fr)", background: c.bg };
+const rootMobile: React.CSSProperties = { minHeight: "100dvh", display: "flex", flexDirection: "column", background: c.bg };
+const rail: React.CSSProperties = { background: c.nav, color: c.navText, display: "flex", flexDirection: "column", padding: "16px 12px", gap: 6, position: "sticky", top: 0, height: "100vh" };
+const railDrawer: React.CSSProperties = { ...rail, position: "fixed", top: 0, left: 0, height: "100dvh", width: 272, maxWidth: "84vw", zIndex: 50, boxShadow: shadow.pop, overflowY: "auto" };
+const backdrop: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(15,20,25,.44)", zIndex: 40 };
+const mTopbar: React.CSSProperties = { position: "sticky", top: 0, zIndex: 20, height: 52, flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", background: c.surface, borderBottom: `1px solid ${c.line}` };
+const burger: React.CSSProperties = { width: 36, height: 36, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", color: c.ink, cursor: "pointer", marginLeft: -6 };
+const drawerClose: React.CSSProperties = { marginLeft: "auto", width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", color: c.navText, cursor: "pointer" };
+const brand: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "6px 10px 14px" };
+const wordmark: React.CSSProperties = { fontSize: 15, fontWeight: 700, letterSpacing: "-0.3px", color: "#fff" };
+const wordmarkDark: React.CSSProperties = { fontSize: 15, fontWeight: 700, letterSpacing: "-0.3px", color: c.ink };
+const navList: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 3 };
+const navSection: React.CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: "0.6px", color: c.navSection, textTransform: "uppercase", padding: "10px 10px 4px" };
+const navItem: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "9px 11px", borderRadius: radius.control, color: c.navText, fontSize: 14, fontWeight: 500, textDecoration: "none", cursor: "pointer", background: "transparent", border: "none", textAlign: "left", width: "100%" };
+const navLabel: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 11 };
+const navItemOn: React.CSSProperties = { ...navItem, background: c.navActiveBg, color: "#fff", fontWeight: 600 };
+const navItemSoon: React.CSSProperties = { ...navItem, cursor: "default", color: c.navSection };
+const soonChip: React.CSSProperties = { fontSize: 10, fontWeight: 600, color: c.navSection, border: `1px solid ${c.navBorder}`, borderRadius: 999, padding: "1px 7px", flexShrink: 0 };
+const railFoot: React.CSSProperties = { marginTop: "auto", display: "flex", flexDirection: "column", gap: 3, paddingTop: 10, borderTop: `1px solid ${c.navBorder}` };
+
+const main: React.CSSProperties = { minWidth: 0, display: "flex", flexDirection: "column" };
+const topbar: React.CSSProperties = { height: 58, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "0 26px", borderBottom: `1px solid ${c.line}`, background: c.surface, position: "sticky", top: 0, zIndex: 10 };
+const topbarMobile: React.CSSProperties = { flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, padding: "12px 16px", borderBottom: `1px solid ${c.line}`, background: c.surface };
+const crumb: React.CSSProperties = { fontSize: 16, fontWeight: 700, color: c.ink, letterSpacing: "-0.3px" };
+const topRight: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" };
+const content: React.CSSProperties = { padding: 28, maxWidth: 1200, width: "100%" };
+const contentMobile: React.CSSProperties = { padding: 16, width: "100%", minWidth: 0 };
+const bareContent: React.CSSProperties = { flex: 1, minHeight: 0 };
