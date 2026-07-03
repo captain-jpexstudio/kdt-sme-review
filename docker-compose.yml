@@ -43,6 +43,17 @@ services:
       - api
       - web
 
+  # 공개 진입로: Cloudflare Tunnel (아웃바운드 상시연결, 공유기 포트 개방 불필요)
+  # 라우팅(도메인→nginx:80)은 Cloudflare 대시보드 Public Hostname에서 설정.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+    depends_on:
+      - nginx
+
 volumes:
   pgdata: {}
   sigdata: {}
