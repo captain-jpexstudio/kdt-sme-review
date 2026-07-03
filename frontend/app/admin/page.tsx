@@ -19,7 +19,6 @@ import {
 } from "@/lib/admin";
 import { getMe } from "@/lib/auth";
 import { Shell } from "@/components/Shell";
-import { useIsMobile } from "@/lib/useIsMobile";
 import { c, radius } from "@/lib/theme";
 
 interface LiveEvent {
@@ -31,7 +30,6 @@ interface LiveEvent {
 
 export default function AdminPage() {
   const router = useRouter();
-  const isMobile = useIsMobile();
   const [ready, setReady] = useState(false);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [reviewers, setReviewers] = useState<ReviewerProgress[]>([]);
@@ -144,7 +142,7 @@ export default function AdminPage() {
         <div style={reviewerList}>
           {reviewers.map((r) => (
             <div key={r.user_id} style={reviewerBlock}>
-              <div style={isMobile ? reviewerRowMobile : reviewerRow}>
+              <div style={reviewerRow} className="adm-reviewer-row">
                 <div style={reviewerMeta}>
                   <b>{r.reviewer_code ?? r.username}</b>
                   <span>{r.completed}/{r.total} · 작업중 {r.in_progress} · 대기 {r.pending}</span>
@@ -202,7 +200,7 @@ export default function AdminPage() {
         <h2 style={panelTitle}>실시간 이벤트</h2>
         {events.length === 0 && <div style={empty}>아직 수신된 이벤트가 없습니다.</div>}
         {events.map((ev, i) => (
-          <div key={`${ev.type}-${ev.task_id ?? ""}-${i}`} style={isMobile ? eventRowMobile : eventRow}>
+          <div key={`${ev.type}-${ev.task_id ?? ""}-${i}`} style={eventRow} className="adm-event-row">
             <b>{ev.type}</b>
             <span>{ev.reviewer_code ?? "-"}</span>
             <span>{ev.task_id ? ev.task_id.slice(0, 8) : ""}</span>
@@ -242,7 +240,6 @@ const liveOff: React.CSSProperties = { ...liveOn, color: c.faint };
 const reviewerList: React.CSSProperties = { display: "grid", gap: 8 };
 const reviewerBlock: React.CSSProperties = { borderTop: `1px solid ${c.line}` };
 const reviewerRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "170px minmax(140px,1fr) 220px auto", gap: 12, alignItems: "center", padding: "12px 0" };
-const reviewerRowMobile: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 10, alignItems: "stretch", padding: "14px 0" };
 const rowActions: React.CSSProperties = { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" };
 const linkButton: React.CSSProperties = { height: 32, display: "inline-flex", alignItems: "center", gap: 5, border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", color: c.ink, padding: "0 10px", fontSize: 12, fontWeight: 500, textDecoration: "none", cursor: "pointer" };
 const disabledLink: React.CSSProperties = { ...linkButton, borderColor: c.line, color: c.faint, background: c.panel, cursor: "not-allowed" };
@@ -262,4 +259,3 @@ const unlockButton: React.CSSProperties = { height: 34, display: "inline-flex", 
 const disabledButton: React.CSSProperties = { ...unlockButton, borderColor: c.line, background: "#f2f4ef", color: c.faint, cursor: "not-allowed" };
 const empty: React.CSSProperties = { color: c.sub, fontSize: 13 };
 const eventRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "120px 120px 100px minmax(0,1fr)", gap: 10, fontSize: 13, borderTop: `1px solid ${c.line}`, padding: "9px 0" };
-const eventRowMobile: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: 12.5, borderTop: `1px solid ${c.line}`, padding: "9px 0" };

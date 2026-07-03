@@ -4,12 +4,10 @@ import { useState } from "react";
 
 import { login } from "@/lib/auth";
 import { Logo } from "@/components/Logo";
-import { useIsMobile } from "@/lib/useIsMobile";
 import { c, radius } from "@/lib/theme";
 
 export default function LoginPage() {
   const router = useRouter();
-  const isMobile = useIsMobile();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -33,42 +31,38 @@ export default function LoginPage() {
   };
 
   return (
-    <main style={isMobile ? shellMobile : shell}>
-      {/* 좌: 브랜드 패널 (데스크톱) */}
-      {!isMobile && (
-        <aside style={brandPane}>
-          <div style={brandTop}>
-            <span style={markChip}><Logo size={30} /></span>
-            <span style={wordmark}>Survey Web</span>
-          </div>
-          <div>
-            <h1 style={hero}>
-              국방 데이터셋
-              <br />
-              검수 워크스페이스
-            </h1>
-            <p style={heroSub}>
-              전문가 검수로 데이터 품질을 끌어올리고, 저작권을 안전하게 귀속합니다.
-            </p>
-            <ul style={points}>
-              <li style={point}><span style={dot} /> 원본 대비 정답 변형 · 오류 태깅</li>
-              <li style={point}><span style={dot} /> 임시저장 · 최종 서명 이관</li>
-              <li style={point}><span style={dot} /> 관리자 실시간 진행률 모니터링</li>
-            </ul>
-          </div>
-          <div style={brandFoot}>© {"(주) JPEX STUDIO"} · K-Defense Bench</div>
-        </aside>
-      )}
+    <main style={shell} className="login-shell">
+      {/* 좌: 브랜드 패널 (데스크톱, 모바일 CSS로 숨김) */}
+      <aside style={brandPane} className="login-brand">
+        <div style={brandTop}>
+          <span style={markChip}><Logo size={30} /></span>
+          <span style={wordmark}>Survey Web</span>
+        </div>
+        <div>
+          <h1 style={hero}>
+            국방 데이터셋
+            <br />
+            검수 워크스페이스
+          </h1>
+          <p style={heroSub}>
+            전문가 검수로 데이터 품질을 끌어올리고, 저작권을 안전하게 귀속합니다.
+          </p>
+          <ul style={points}>
+            <li style={point}><span style={dot} /> 원본 대비 정답 변형 · 오류 태깅</li>
+            <li style={point}><span style={dot} /> 임시저장 · 최종 서명 이관</li>
+            <li style={point}><span style={dot} /> 관리자 실시간 진행률 모니터링</li>
+          </ul>
+        </div>
+        <div style={brandFoot}>© {"(주) JPEX STUDIO"} · K-Defense Bench</div>
+      </aside>
 
       {/* 우: 폼 */}
-      <section style={isMobile ? formPaneMobile : formPane}>
+      <section style={formPane} className="login-formpane">
         <div style={formCard}>
-          {isMobile && (
-            <div style={mobileBrand}>
-              <span style={markChipSm}><Logo size={24} /></span>
-              <span style={mobileWordmark}>Survey Web</span>
-            </div>
-          )}
+          <div style={mobileBrand} className="login-mbrand">
+            <span style={markChipSm}><Logo size={24} /></span>
+            <span style={mobileWordmark}>Survey Web</span>
+          </div>
           <h2 style={title}>로그인</h2>
           <p style={lead}>배정된 검수 계정으로 로그인해 주세요.</p>
           <form onSubmit={onSubmit} style={form}>
@@ -90,9 +84,7 @@ export default function LoginPage() {
 }
 
 const shell: React.CSSProperties = { minHeight: "100vh", display: "grid", gridTemplateColumns: "1.05fr 1fr", background: c.surface };
-const shellMobile: React.CSSProperties = { minHeight: "100dvh", display: "flex", flexDirection: "column", background: c.bg };
-const formPaneMobile: React.CSSProperties = { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "32px 20px", background: c.bg };
-const mobileBrand: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, marginBottom: 24 };
+const mobileBrand: React.CSSProperties = { alignItems: "center", gap: 10, marginBottom: 24 };
 const markChipSm: React.CSSProperties = { width: 38, height: 38, borderRadius: 10, background: c.brandTint, display: "inline-flex", alignItems: "center", justifyContent: "center" };
 const mobileWordmark: React.CSSProperties = { fontSize: 16, fontWeight: 700, letterSpacing: "-0.3px", color: c.ink };
 const brandPane: React.CSSProperties = {

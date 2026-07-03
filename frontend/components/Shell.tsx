@@ -5,7 +5,6 @@ import { useState, type ReactNode } from "react";
 
 import { api } from "@/lib/api";
 import { Logo } from "@/components/Logo";
-import { useIsMobile } from "@/lib/useIsMobile";
 import { c, radius, shadow } from "@/lib/theme";
 
 type Item = { key: string; label: string; icon: typeof LayoutDashboard; href?: string; anchor?: string; soon?: boolean };
@@ -41,7 +40,6 @@ export function Shell({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const isMobile = useIsMobile();
   const [drawer, setDrawer] = useState(false);
   const logout = async () => {
     try {
@@ -57,9 +55,6 @@ export function Shell({
       <div style={brand}>
         <Logo size={28} />
         <span style={wordmark}>Survey Web</span>
-        {isMobile && (
-          <button aria-label="닫기" onClick={() => setDrawer(false)} style={drawerClose}><X size={18} /></button>
-        )}
       </div>
       <nav style={navList}>
         <div style={navSection}>{role === "admin" ? "관리" : "검수"}</div>
@@ -105,46 +100,48 @@ export function Shell({
   );
 
   return (
-    <div style={isMobile ? rootMobile : root}>
-      {isMobile ? (
+    <div style={root} className="shell-root">
+      {/* 모바일 상단바 — CSS로 데스크톱에서 숨김 */}
+      <header style={mTopbar} className="shell-mtop">
+        <button aria-label="메뉴" onClick={() => setDrawer(true)} style={burger}><Menu size={20} /></button>
+        <Logo size={24} />
+        <span style={wordmarkDark}>Survey Web</span>
+      </header>
+
+      {/* 데스크톱 좌측 레일 — CSS로 모바일에서 숨김 */}
+      <aside style={rail} className="shell-rail">{railInner}</aside>
+
+      {/* 모바일 드로어 */}
+      {drawer && (
         <>
-          <header style={mTopbar}>
-            <button aria-label="메뉴" onClick={() => setDrawer(true)} style={burger}><Menu size={20} /></button>
-            <Logo size={24} />
-            <span style={wordmarkDark}>Survey Web</span>
-          </header>
-          {drawer && (
-            <>
-              <div style={backdrop} onClick={() => setDrawer(false)} />
-              <aside style={railDrawer}>{railInner}</aside>
-            </>
-          )}
+          <div style={backdrop} onClick={() => setDrawer(false)} />
+          <aside style={railDrawer}>
+            <button aria-label="닫기" onClick={() => setDrawer(false)} style={drawerClose}><X size={18} /></button>
+            {railInner}
+          </aside>
         </>
-      ) : (
-        <aside style={rail}>{railInner}</aside>
       )}
 
       <div style={main}>
         {title !== undefined && (
-          <header style={isMobile ? topbarMobile : topbar}>
+          <header style={topbar} className="shell-topbar">
             <div style={crumb}>{title}</div>
             {right && <div style={topRight}>{right}</div>}
           </header>
         )}
-        <div style={bare ? bareContent : (isMobile ? contentMobile : content)}>{children}</div>
+        <div style={bare ? bareContent : content} className={bare ? undefined : "shell-content"}>{children}</div>
       </div>
     </div>
   );
 }
 
 const root: React.CSSProperties = { minHeight: "100vh", display: "grid", gridTemplateColumns: "236px minmax(0, 1fr)", background: c.bg };
-const rootMobile: React.CSSProperties = { minHeight: "100dvh", display: "flex", flexDirection: "column", background: c.bg };
 const rail: React.CSSProperties = { background: c.nav, color: c.navText, display: "flex", flexDirection: "column", padding: "16px 12px", gap: 6, position: "sticky", top: 0, height: "100vh" };
 const railDrawer: React.CSSProperties = { ...rail, position: "fixed", top: 0, left: 0, height: "100dvh", width: 272, maxWidth: "84vw", zIndex: 50, boxShadow: shadow.pop, overflowY: "auto" };
 const backdrop: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(15,20,25,.44)", zIndex: 40 };
 const mTopbar: React.CSSProperties = { position: "sticky", top: 0, zIndex: 20, height: 52, flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", background: c.surface, borderBottom: `1px solid ${c.line}` };
 const burger: React.CSSProperties = { width: 36, height: 36, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", color: c.ink, cursor: "pointer", marginLeft: -6 };
-const drawerClose: React.CSSProperties = { marginLeft: "auto", width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", color: c.navText, cursor: "pointer" };
+const drawerClose: React.CSSProperties = { position: "absolute", top: 12, right: 10, width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", color: c.navText, cursor: "pointer", zIndex: 2 };
 const brand: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "6px 10px 14px" };
 const wordmark: React.CSSProperties = { fontSize: 15, fontWeight: 700, letterSpacing: "-0.3px", color: "#fff" };
 const wordmarkDark: React.CSSProperties = { fontSize: 15, fontWeight: 700, letterSpacing: "-0.3px", color: c.ink };
@@ -157,11 +154,9 @@ const navItemSoon: React.CSSProperties = { ...navItem, cursor: "default", color:
 const soonChip: React.CSSProperties = { fontSize: 10, fontWeight: 600, color: c.navSection, border: `1px solid ${c.navBorder}`, borderRadius: 999, padding: "1px 7px", flexShrink: 0 };
 const railFoot: React.CSSProperties = { marginTop: "auto", display: "flex", flexDirection: "column", gap: 3, paddingTop: 10, borderTop: `1px solid ${c.navBorder}` };
 
-const main: React.CSSProperties = { minWidth: 0, display: "flex", flexDirection: "column" };
+const main: React.CSSProperties = { minWidth: 0, display: "flex", flexDirection: "column", flex: 1 };
 const topbar: React.CSSProperties = { height: 58, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "0 26px", borderBottom: `1px solid ${c.line}`, background: c.surface, position: "sticky", top: 0, zIndex: 10 };
-const topbarMobile: React.CSSProperties = { flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, padding: "12px 16px", borderBottom: `1px solid ${c.line}`, background: c.surface };
 const crumb: React.CSSProperties = { fontSize: 16, fontWeight: 700, color: c.ink, letterSpacing: "-0.3px" };
 const topRight: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" };
 const content: React.CSSProperties = { padding: 28, maxWidth: 1200, width: "100%" };
-const contentMobile: React.CSSProperties = { padding: 16, width: "100%", minWidth: 0 };
 const bareContent: React.CSSProperties = { flex: 1, minHeight: 0 };

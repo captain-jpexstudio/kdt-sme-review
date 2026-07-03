@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { SignaturePad, type SignatureValue } from "@/components/SignaturePad";
 import { postAgreement } from "@/lib/auth";
-import { useIsMobile } from "@/lib/useIsMobile";
 import { c, radius, shadow } from "@/lib/theme";
 
 type ConsentKey = "security" | "ip_rights" | "privacy" | "tax";
@@ -84,7 +83,6 @@ const INITIAL = { security: false, ip_rights: false, privacy: false, tax: false 
 
 export default function AgreementPage() {
   const router = useRouter();
-  const isMobile = useIsMobile();
   const [checks, setChecks] = useState<Record<ConsentKey, boolean>>(INITIAL);
   const [sig, setSig] = useState<SignatureValue | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,8 +108,8 @@ export default function AgreementPage() {
   };
 
   return (
-    <main style={isMobile ? pageMobile : page}>
-      <div style={isMobile ? cardMobile : card}>
+    <main style={page} className="agr-page">
+      <div style={card} className="agr-card">
         <div style={brand}>(주) JPEX STUDIO</div>
         <h1 style={docTitle}>국방 데이터셋 자문 및 검수 참여 동의·보안 서약서</h1>
         <p style={lead}>
@@ -147,7 +145,7 @@ export default function AgreementPage() {
             {p.rows && (
               <dl style={rowTable}>
                 {p.rows.map((r, i) => (
-                  <div key={i} style={isMobile ? rowLineMobile : rowLine}>
+                  <div key={i} style={rowLine} className="agr-row">
                     <dt style={rowKey}>{r.label}</dt>
                     <dd style={rowVal}>{r.text}</dd>
                   </div>
@@ -185,9 +183,7 @@ export default function AgreementPage() {
 }
 
 const page: React.CSSProperties = { minHeight: "100vh", background: c.bg, padding: "44px 16px", color: c.ink };
-const pageMobile: React.CSSProperties = { minHeight: "100dvh", background: c.bg, padding: "20px 12px", color: c.ink };
 const card: React.CSSProperties = { maxWidth: 740, margin: "0 auto", background: c.surface, border: `1px solid ${c.line}`, borderRadius: radius.card, padding: "40px 44px", boxShadow: shadow.card };
-const cardMobile: React.CSSProperties = { maxWidth: 740, margin: "0 auto", background: c.surface, border: `1px solid ${c.line}`, borderRadius: radius.card, padding: "24px 18px", boxShadow: shadow.card };
 const brand: React.CSSProperties = { fontSize: 12, letterSpacing: 1, color: c.brand, fontWeight: 700 };
 const docTitle: React.CSSProperties = { fontSize: 23, fontWeight: 700, margin: "8px 0 14px", lineHeight: 1.4, letterSpacing: "-0.3px" };
 const lead: React.CSSProperties = { fontSize: 13.5, lineHeight: 1.8, color: c.sub, margin: 0 };
@@ -206,7 +202,6 @@ const clauseItem: React.CSSProperties = { fontSize: 12.5, lineHeight: 1.75, colo
 const clauseLabel: React.CSSProperties = { color: c.ink };
 const rowTable: React.CSSProperties = { margin: 0, display: "grid", gap: 1, background: c.line, border: `1px solid ${c.line}`, borderRadius: radius.control, overflow: "hidden" };
 const rowLine: React.CSSProperties = { display: "grid", gridTemplateColumns: "140px 1fr", gap: 1 };
-const rowLineMobile: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr", gap: 1 };
 const rowKey: React.CSSProperties = { fontSize: 12.5, fontWeight: 600, color: c.ink, background: "#f2f4ef", padding: "11px 13px" };
 const rowVal: React.CSSProperties = { fontSize: 12.5, lineHeight: 1.7, color: c.sub, background: "#fff", padding: "11px 13px" };
 const consentRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, marginTop: 13, padding: "12px 14px", border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", fontSize: 13.5, fontWeight: 600, color: c.ink, cursor: "pointer" };
