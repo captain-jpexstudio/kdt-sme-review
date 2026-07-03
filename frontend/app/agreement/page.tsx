@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { SignaturePad, type SignatureValue } from "@/components/SignaturePad";
 import { postAgreement } from "@/lib/auth";
+import { useIsMobile } from "@/lib/useIsMobile";
+import { c, radius, shadow } from "@/lib/theme";
 
 type ConsentKey = "security" | "ip_rights" | "privacy" | "tax";
 
@@ -82,6 +84,7 @@ const INITIAL = { security: false, ip_rights: false, privacy: false, tax: false 
 
 export default function AgreementPage() {
   const router = useRouter();
+  const isMobile = useIsMobile();
   const [checks, setChecks] = useState<Record<ConsentKey, boolean>>(INITIAL);
   const [sig, setSig] = useState<SignatureValue | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,8 +110,8 @@ export default function AgreementPage() {
   };
 
   return (
-    <main style={page}>
-      <div style={card}>
+    <main style={isMobile ? pageMobile : page}>
+      <div style={isMobile ? cardMobile : card}>
         <div style={brand}>(주) JPEX STUDIO</div>
         <h1 style={docTitle}>국방 데이터셋 자문 및 검수 참여 동의·보안 서약서</h1>
         <p style={lead}>
@@ -144,7 +147,7 @@ export default function AgreementPage() {
             {p.rows && (
               <dl style={rowTable}>
                 {p.rows.map((r, i) => (
-                  <div key={i} style={rowLine}>
+                  <div key={i} style={isMobile ? rowLineMobile : rowLine}>
                     <dt style={rowKey}>{r.label}</dt>
                     <dd style={rowVal}>{r.text}</dd>
                   </div>
@@ -181,35 +184,38 @@ export default function AgreementPage() {
   );
 }
 
-const page: React.CSSProperties = { minHeight: "100vh", background: "#eef0ea", padding: "40px 16px", fontFamily: "system-ui, -apple-system, 'Apple SD Gothic Neo', sans-serif", color: "#1f2937" };
-const card: React.CSSProperties = { maxWidth: 720, margin: "0 auto", background: "#fff", border: "1px solid #e2e4dd", borderRadius: 12, padding: "36px 40px", boxShadow: "0 1px 3px rgba(0,0,0,.04)" };
-const brand: React.CSSProperties = { fontSize: 12, letterSpacing: 1, color: "#1d6f61", fontWeight: 700 };
-const docTitle: React.CSSProperties = { fontSize: 22, fontWeight: 700, margin: "6px 0 14px", lineHeight: 1.4 };
-const lead: React.CSSProperties = { fontSize: 13.5, lineHeight: 1.75, color: "#4b5563", margin: 0 };
-const allRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, margin: "22px 0 8px", padding: "14px 16px", border: "1.5px solid #1d6f61", borderRadius: 8, background: "#f1f7f5", fontSize: 15, fontWeight: 700, cursor: "pointer" };
-const allHint: React.CSSProperties = { fontWeight: 400, fontSize: 12.5, color: "#6b7280" };
-const cbAll: React.CSSProperties = { width: 18, height: 18, accentColor: "#1d6f61" };
-const partBox: React.CSSProperties = { marginTop: 16, padding: "18px 20px", border: "1px solid #e5e7eb", borderRadius: 10, background: "#fcfcfb" };
-const partHead: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 };
-const partNo: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#1d6f61", background: "#e7f2ef", borderRadius: 4, padding: "2px 7px" };
-const partTitle: React.CSSProperties = { fontSize: 15.5, fontWeight: 700, margin: 0, flex: 1 };
-const badgeReq: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#9a3412", background: "#fef0e6", border: "1px solid #f5c89f", borderRadius: 999, padding: "2px 9px" };
-const badgeChk: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#3f6212", background: "#f0f7e6", border: "1px solid #cfe3a0", borderRadius: 999, padding: "2px 9px" };
-const intro: React.CSSProperties = { fontSize: 13, lineHeight: 1.7, color: "#374151", margin: "0 0 10px" };
-const clauseList: React.CSSProperties = { margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 8 };
-const clauseItem: React.CSSProperties = { fontSize: 12.5, lineHeight: 1.7, color: "#4b5563", paddingLeft: 12, borderLeft: "2px solid #e5e7eb" };
-const clauseLabel: React.CSSProperties = { color: "#1f2937" };
-const rowTable: React.CSSProperties = { margin: 0, display: "grid", gap: 1, background: "#e5e7eb", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" };
+const page: React.CSSProperties = { minHeight: "100vh", background: c.bg, padding: "44px 16px", color: c.ink };
+const pageMobile: React.CSSProperties = { minHeight: "100dvh", background: c.bg, padding: "20px 12px", color: c.ink };
+const card: React.CSSProperties = { maxWidth: 740, margin: "0 auto", background: c.surface, border: `1px solid ${c.line}`, borderRadius: radius.card, padding: "40px 44px", boxShadow: shadow.card };
+const cardMobile: React.CSSProperties = { maxWidth: 740, margin: "0 auto", background: c.surface, border: `1px solid ${c.line}`, borderRadius: radius.card, padding: "24px 18px", boxShadow: shadow.card };
+const brand: React.CSSProperties = { fontSize: 12, letterSpacing: 1, color: c.brand, fontWeight: 700 };
+const docTitle: React.CSSProperties = { fontSize: 23, fontWeight: 700, margin: "8px 0 14px", lineHeight: 1.4, letterSpacing: "-0.3px" };
+const lead: React.CSSProperties = { fontSize: 13.5, lineHeight: 1.8, color: c.sub, margin: 0 };
+const allRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 11, margin: "24px 0 8px", padding: "15px 18px", border: `1.5px solid ${c.brand}`, borderRadius: radius.control, background: c.brandTint, fontSize: 15, fontWeight: 700, cursor: "pointer" };
+const allHint: React.CSSProperties = { fontWeight: 400, fontSize: 12.5, color: c.sub };
+const cbAll: React.CSSProperties = { width: 18, height: 18, accentColor: c.brand };
+const partBox: React.CSSProperties = { marginTop: 16, padding: "20px 22px", border: `1px solid ${c.line}`, borderRadius: radius.card, background: c.panel };
+const partHead: React.CSSProperties = { display: "flex", alignItems: "center", gap: 9, marginBottom: 11 };
+const partNo: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: c.brandText, background: c.brandTintStrong, borderRadius: radius.pill, padding: "3px 10px" };
+const partTitle: React.CSSProperties = { fontSize: 15.5, fontWeight: 700, margin: 0, flex: 1, letterSpacing: "-0.2px" };
+const badgeReq: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#9a3412", background: "#fef0e6", border: "1px solid #f5c89f", borderRadius: radius.pill, padding: "2px 10px" };
+const badgeChk: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: c.brandText, background: c.brandTint, border: `1px solid ${c.brandBorder}`, borderRadius: radius.pill, padding: "2px 10px" };
+const intro: React.CSSProperties = { fontSize: 13, lineHeight: 1.75, color: "#3f4a41", margin: "0 0 10px" };
+const clauseList: React.CSSProperties = { margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 9 };
+const clauseItem: React.CSSProperties = { fontSize: 12.5, lineHeight: 1.75, color: c.sub, paddingLeft: 13, borderLeft: `2px solid ${c.brandBorder}` };
+const clauseLabel: React.CSSProperties = { color: c.ink };
+const rowTable: React.CSSProperties = { margin: 0, display: "grid", gap: 1, background: c.line, border: `1px solid ${c.line}`, borderRadius: radius.control, overflow: "hidden" };
 const rowLine: React.CSSProperties = { display: "grid", gridTemplateColumns: "140px 1fr", gap: 1 };
-const rowKey: React.CSSProperties = { fontSize: 12.5, fontWeight: 600, color: "#374151", background: "#f3f4f1", padding: "10px 12px" };
-const rowVal: React.CSSProperties = { fontSize: 12.5, lineHeight: 1.65, color: "#4b5563", background: "#fff", padding: "10px 12px" };
-const consentRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 9, marginTop: 12, padding: "11px 13px", border: "1px solid #d7d9d2", borderRadius: 7, background: "#fff", fontSize: 13.5, fontWeight: 600, color: "#374151", cursor: "pointer" };
-const consentRowOn: React.CSSProperties = { ...consentRow, border: "1px solid #1d6f61", background: "#f1f7f5", color: "#145348" };
-const cb: React.CSSProperties = { width: 17, height: 17, accentColor: "#1d6f61" };
-const signWrap: React.CSSProperties = { marginTop: 26, paddingTop: 22, borderTop: "1px solid #e5e7eb" };
+const rowLineMobile: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr", gap: 1 };
+const rowKey: React.CSSProperties = { fontSize: 12.5, fontWeight: 600, color: c.ink, background: "#f2f4ef", padding: "11px 13px" };
+const rowVal: React.CSSProperties = { fontSize: 12.5, lineHeight: 1.7, color: c.sub, background: "#fff", padding: "11px 13px" };
+const consentRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, marginTop: 13, padding: "12px 14px", border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", fontSize: 13.5, fontWeight: 600, color: c.ink, cursor: "pointer" };
+const consentRowOn: React.CSSProperties = { ...consentRow, border: `1px solid ${c.brand}`, background: c.brandTint, color: c.brandText };
+const cb: React.CSSProperties = { width: 17, height: 17, accentColor: c.brand };
+const signWrap: React.CSSProperties = { marginTop: 28, paddingTop: 24, borderTop: `1px solid ${c.line}` };
 const signTitle: React.CSSProperties = { fontSize: 15, fontWeight: 700, margin: "0 0 4px" };
-const signHint: React.CSSProperties = { fontSize: 12.5, color: "#6b7280", margin: "0 0 12px" };
-const errorText: React.CSSProperties = { color: "#a32d2d", fontSize: 13, marginTop: 12 };
-const submitOn: React.CSSProperties = { width: "100%", marginTop: 18, padding: "13px 14px", borderRadius: 8, border: "1px solid #1d6f61", background: "#1d6f61", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" };
-const submitOff: React.CSSProperties = { ...submitOn, border: "1px solid #d1d5db", background: "#f1f1ee", color: "#9ca3af", cursor: "not-allowed" };
-const footHint: React.CSSProperties = { fontSize: 12, color: "#9ca3af", textAlign: "center", margin: "8px 0 0" };
+const signHint: React.CSSProperties = { fontSize: 12.5, color: c.sub, margin: "0 0 12px" };
+const errorText: React.CSSProperties = { color: c.danger, fontSize: 13, marginTop: 12 };
+const submitOn: React.CSSProperties = { width: "100%", marginTop: 20, padding: "13px 14px", borderRadius: radius.control, border: "1px solid transparent", background: c.brand, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" };
+const submitOff: React.CSSProperties = { ...submitOn, border: `1px solid ${c.line2}`, background: "#f1f2ee", color: c.faint, cursor: "not-allowed" };
+const footHint: React.CSSProperties = { fontSize: 12, color: c.faint, textAlign: "center", margin: "10px 0 0" };

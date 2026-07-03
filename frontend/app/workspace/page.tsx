@@ -1,7 +1,8 @@
 "use client";
 
 import axios from "axios";
-import { Check, ChevronRight, Edit3, FileSignature, Filter, Loader2, Lock, RotateCcw, Save, Search } from "lucide-react";
+import { diff_match_patch, DIFF_DELETE, DIFF_INSERT } from "diff-match-patch";
+import { ArrowLeft, Check, ChevronRight, Edit3, FileSignature, Filter, Loader2, Lock, RotateCcw, Save, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -27,6 +28,9 @@ import {
   type TaskSummary,
 } from "@/lib/tasks";
 import { useTaskStore } from "@/stores/taskStore";
+import { Shell } from "@/components/Shell";
+import { useIsMobile } from "@/lib/useIsMobile";
+import { c, radius, shadow } from "@/lib/theme";
 
 const REASONS: ErrorReasonName[] = ["문맥_어색", "오타", "사실관계_오류", "전문용어_오용", "중복", "기타", "이상없음"];
 const STATUS_LABEL: Record<TaskStatus, string> = { pending: "대기", in_progress: "작업중", completed: "완료" };
@@ -39,6 +43,8 @@ const FILTERS: { key: TaskFilter; label: string }[] = [
 
 export default function WorkspacePage() {
   const router = useRouter();
+  const isMobile = useIsMobile();
+  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
   const { currentId, filter, query, sort, set } = useTaskStore();
   const [ready, setReady] = useState(false);
   const [summary, setSummary] = useState<TaskSummary>({ total: 0, completed: 0, in_progress: 0, pending: 0 });
@@ -277,8 +283,10 @@ export default function WorkspacePage() {
   }
 
   return (
-    <main style={page}>
-      <aside style={sidebar}>
+    <Shell role="reviewer" bare>
+      <main style={isMobile ? pageMobile : page}>
+      {(!isMobile || mobileView === "list") && (
+      <aside style={isMobile ? sidebarMobile : sidebar}>
         <div style={topbar}>
           <div>
             <div style={eyebrow}>검수 워크스페이스</div>
@@ -324,7 +332,7 @@ export default function WorkspacePage() {
           {items.map((item) => (
             <button
               key={item.task_id}
-              onClick={() => loadDetail(item.task_id)}
+              onClick={() => { loadDetail(item.task_id); if (isMobile) setMobileView("detail"); }}
               style={item.task_id === current?.task_id ? itemActive : itemButton}
             >
               <span style={seq}>#{String(item.seq).padStart(3, "0")}</span>
@@ -336,8 +344,15 @@ export default function WorkspacePage() {
           ))}
         </div>
       </aside>
+      )}
 
-      <section style={workspace}>
+      {(!isMobile || mobileView === "detail") && (
+      <section style={isMobile ? workspaceMobile : workspace}>
+        {isMobile && (
+          <button onClick={() => setMobileView("list")} style={backButton}>
+            <ArrowLeft size={16} /> 목록으로
+          </button>
+        )}
         {error && <div style={errorBox}>{error}</div>}
         {locked && (
           <div style={lockedBanner}>
@@ -352,55 +367,69 @@ export default function WorkspacePage() {
         {busyDetail && <div style={emptyDetail}><Loader2 size={18} /> 불러오는 중</div>}
         {current && !busyDetail && (
           <>
-            <header style={detailHeader}>
-              <div>
-                <div style={eyebrow}>#{current.dataset_id} · {STATUS_LABEL[current.status]} · v{current.version}</div>
-                <h2 style={detailTitle}>{current.original_q}</h2>
-              </div>
-              <div style={actions}>
-                {eligibility.eligible && !locked && (
-                  <button onClick={() => setFinalOpen(true)} style={primaryButton}>
-                    <FileSignature size={16} /> 최종 제출
-                  </button>
-                )}
-                <button onClick={() => saveDraft()} disabled={saving || !dirty || locked} style={saving || dirty && !locked ? secondaryButton : disabledButton}>
-                  {saving ? <Loader2 size={16} /> : <Save size={16} />} 임시저장
-                </button>
-                <button onClick={() => submitCurrent()} disabled={submitting || !editStats?.valid || locked} style={editStats?.valid && !locked ? primaryButton : disabledButton}>
-                  {submitting ? <Loader2 size={16} /> : <Check size={16} />} 제출
-                </button>
-              </div>
-            </header>
-
-            <div style={statusLine}>
-              <span>{dirty ? "수정됨" : savedAt ? `${savedAt} 저장됨` : "동기화됨"}</span>
-              {editStats && <span>변경 {editStats.changed}단어 · {Math.round(editStats.ratio * 100)}%</span>}
-              {editStats?.tier === "trivial" && <span style={warnText}>변경량 낮음</span>}
-              <span>최종 {eligibility.completed}/{eligibility.total}</span>
+            <div style={detailHead}>
+              <div style={eyebrow}>#{current.dataset_id} · {STATUS_LABEL[current.status]} · v{current.version}</div>
+              <h2 style={detailTitle}>{current.original_q}</h2>
             </div>
 
-            <div style={columns}>
-              <div style={panel}>
-                <div style={panelLabel}>원본 질문</div>
-                <div style={readonlyText}>{current.original_q}</div>
-                <div style={panelLabel}>원본 정답</div>
-                <div style={readonlyText}>{current.original_a}</div>
-              </div>
-              <div style={editorPanel}>
-                <label style={fieldLabel}>수정 질문</label>
-                <textarea
-                  value={qDraft}
-                  onChange={(e) => { setQDraft(e.target.value); markDirty(); }}
-                  disabled={locked}
-                  style={questionArea}
-                />
-                <label style={fieldLabel}>수정 정답</label>
-                <textarea
-                  value={aDraft}
-                  onChange={(e) => { setADraft(e.target.value); markDirty(); }}
-                  disabled={locked}
-                  style={answerArea}
-                />
+            <div style={stack}>
+              {/* 질문 */}
+              <section style={card}>
+                <div style={cardHead}><span style={cardTitle}>질문</span></div>
+                <div style={isMobile ? cmpMobile : cmp}>
+                  <div style={cmpCol}>
+                    <div style={cmpLabel}>원본</div>
+                    <div style={readonlyText}>{current.original_q}</div>
+                  </div>
+                  <div style={cmpCol}>
+                    <div style={cmpLabel}>수정 질문</div>
+                    <textarea
+                      value={qDraft}
+                      onChange={(e) => { setQDraft(e.target.value); markDirty(); }}
+                      disabled={locked}
+                      style={qArea}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* 정답 검수 (핵심) */}
+              <section style={cardHero}>
+                <div style={cardHead}>
+                  <span style={cardTitle}>정답 검수 <span style={cardHint}>· 원본에서 최소 1단어 이상 수정해야 제출됩니다</span></span>
+                  {editStats && (
+                    <span style={editStats.tier === "trivial" ? metaWarn : metaOk}>
+                      변경 {editStats.changed}단어 · {Math.round(editStats.ratio * 100)}%{editStats.tier === "trivial" ? " · 변경량 낮음" : ""}
+                    </span>
+                  )}
+                </div>
+                <div style={isMobile ? cmpMobile : cmp}>
+                  <div style={cmpCol}>
+                    <div style={cmpLabel}>원본 정답</div>
+                    <div style={readonlyText}>{current.original_a}</div>
+                  </div>
+                  <div style={cmpCol}>
+                    <div style={cmpLabel}>수정 정답</div>
+                    <textarea
+                      value={aDraft}
+                      onChange={(e) => { setADraft(e.target.value); markDirty(); }}
+                      disabled={locked}
+                      style={aArea}
+                    />
+                  </div>
+                </div>
+                <div style={diffWrap}>
+                  <div style={cmpLabel}>
+                    변경 미리보기
+                    <span style={diffLegend}><span style={legIns}>추가</span><span style={legDel}>삭제</span></span>
+                  </div>
+                  <InlineDiff original={current.original_a} edited={aDraft} />
+                </div>
+              </section>
+
+              {/* 오류 유형 · 메모 */}
+              <section style={card}>
+                <div style={cardHead}><span style={cardTitle}>오류 유형 · 메모</span></div>
                 <div style={reasonGrid}>
                   {REASONS.map((reason) => {
                     const checked = reasons.some((r) => r.reason === reason);
@@ -416,14 +445,37 @@ export default function WorkspacePage() {
                   value={note}
                   onChange={(e) => { setNote(e.target.value); markDirty(); }}
                   disabled={locked}
-                  placeholder="메모"
+                  placeholder="메모 (선택)"
                   style={noteArea}
                 />
+              </section>
+            </div>
+
+            {/* 하단 고정 액션바 */}
+            <div style={isMobile ? actionBarMobile : actionBar}>
+              <div style={actionInfo}>
+                <span style={dirty ? saveDirty : saveOk}>{dirty ? "● 저장 대기 중" : savedAt ? `${savedAt} 저장됨` : "동기화됨"}</span>
+                <span style={sep}>·</span>
+                <span>최종 제출 대상 {eligibility.completed}/{eligibility.total}</span>
+              </div>
+              <div style={isMobile ? actionsMobile : actions}>
+                {eligibility.eligible && !locked && (
+                  <button onClick={() => setFinalOpen(true)} style={finalButton}>
+                    <FileSignature size={16} /> 최종 제출
+                  </button>
+                )}
+                <button onClick={() => saveDraft()} disabled={saving || !dirty || locked} style={(saving || dirty) && !locked ? secondaryButton : disabledButton}>
+                  {saving ? <Loader2 size={16} /> : <Save size={16} />} 임시저장
+                </button>
+                <button onClick={() => submitCurrent()} disabled={submitting || !editStats?.valid || locked} style={editStats?.valid && !locked ? primaryButton : disabledButton}>
+                  {submitting ? <Loader2 size={16} /> : <Check size={16} />} 제출
+                </button>
               </div>
             </div>
           </>
         )}
       </section>
+      )}
       {finalOpen && (
         <div style={modalBackdrop}>
           <div style={modal}>
@@ -448,14 +500,35 @@ export default function WorkspacePage() {
           </div>
         </div>
       )}
-    </main>
+      </main>
+    </Shell>
+  );
+}
+
+const _dmp = new diff_match_patch();
+function InlineDiff({ original, edited }: { original: string; edited: string }) {
+  const parts = useMemo(() => {
+    const d = _dmp.diff_main(original || "", edited || "");
+    _dmp.diff_cleanupSemantic(d);
+    return d;
+  }, [original, edited]);
+  const changed = parts.some(([op]) => op !== 0);
+  if (!changed) return <div style={diffEmpty}>아직 변경 사항이 없습니다. 정답을 수정하면 여기에 표시됩니다.</div>;
+  return (
+    <div style={diffBox}>
+      {parts.map(([op, data], i) => {
+        if (op === DIFF_INSERT) return <span key={i} style={insTok}>{data}</span>;
+        if (op === DIFF_DELETE) return <span key={i} style={delTok}>{data}</span>;
+        return <span key={i}>{data}</span>;
+      })}
+    </div>
   );
 }
 
 function statusColor(status: TaskStatus) {
-  if (status === "completed") return "#0f766e";
-  if (status === "in_progress") return "#b45309";
-  return "#9ca3af";
+  if (status === "completed") return c.brand;
+  if (status === "in_progress") return c.warn;
+  return c.faint;
 }
 
 function timeLabel() {
@@ -475,58 +548,83 @@ function errorText(e: unknown) {
   return "요청 처리에 실패했습니다.";
 }
 
-const loadingPage: React.CSSProperties = { padding: 40, fontFamily: "system-ui", color: "#6b7280" };
-const page: React.CSSProperties = { minHeight: "100vh", display: "grid", gridTemplateColumns: "360px minmax(0, 1fr)", fontFamily: "system-ui", background: "#f7f8f5", color: "#111827" };
-const sidebar: React.CSSProperties = { borderRight: "1px solid #d7d9d2", background: "#fbfbf8", padding: 18, display: "flex", flexDirection: "column", gap: 12, minHeight: "100vh" };
+const loadingPage: React.CSSProperties = { padding: 40, color: c.sub };
+const page: React.CSSProperties = { height: "100vh", display: "grid", gridTemplateColumns: "340px minmax(0, 1fr)", background: c.bg, color: c.ink, minHeight: 0 };
+const pageMobile: React.CSSProperties = { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: c.bg, color: c.ink };
+const sidebar: React.CSSProperties = { borderRight: `1px solid ${c.line}`, background: c.surface, padding: 18, display: "flex", flexDirection: "column", gap: 13, height: "100vh", overflow: "hidden" };
+const sidebarMobile: React.CSSProperties = { background: c.surface, padding: 16, display: "flex", flexDirection: "column", gap: 12, flex: 1, minHeight: 0, overflow: "hidden" };
 const topbar: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 };
-const eyebrow: React.CSSProperties = { fontSize: 12, color: "#6b7280", marginBottom: 4 };
-const title: React.CSSProperties = { fontSize: 24, lineHeight: 1.1, margin: 0 };
-const iconButton: React.CSSProperties = { width: 34, height: 34, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid #cfd3ca", borderRadius: 6, background: "#fff", cursor: "pointer" };
-const progressTrack: React.CSSProperties = { height: 7, borderRadius: 999, background: "#e5e7df", overflow: "hidden" };
-const progressBar: React.CSSProperties = { height: "100%", background: "#1d6f61", transition: "width 180ms ease" };
-const lockedMini: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, border: "1px solid #d8caa6", background: "#fff8e6", color: "#765616", borderRadius: 6, padding: "8px 10px", fontSize: 13 };
-const searchBox: React.CSSProperties = { height: 36, display: "flex", alignItems: "center", gap: 8, border: "1px solid #cfd3ca", borderRadius: 6, background: "#fff", padding: "0 9px" };
-const searchInput: React.CSSProperties = { border: 0, outline: 0, background: "transparent", width: "100%", fontSize: 14 };
+const eyebrow: React.CSSProperties = { fontSize: 12, color: c.sub, marginBottom: 4, fontWeight: 500 };
+const title: React.CSSProperties = { fontSize: 25, lineHeight: 1.1, margin: 0, fontWeight: 700, letterSpacing: "-0.5px" };
+const iconButton: React.CSSProperties = { width: 34, height: 34, display: "inline-flex", alignItems: "center", justifyContent: "center", border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", color: c.sub, cursor: "pointer" };
+const progressTrack: React.CSSProperties = { height: 8, borderRadius: radius.pill, background: "#e7ebe2", overflow: "hidden" };
+const progressBar: React.CSSProperties = { height: "100%", background: `linear-gradient(90deg, ${c.brand}, ${c.brandStrong})`, borderRadius: radius.pill, transition: "width 220ms ease" };
+const lockedMini: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, border: `1px solid ${c.warnBorder}`, background: c.warnBg, color: c.warnText, borderRadius: radius.control, padding: "9px 11px", fontSize: 13 };
+const searchBox: React.CSSProperties = { height: 38, display: "flex", alignItems: "center", gap: 8, border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", padding: "0 11px" };
+const searchInput: React.CSSProperties = { border: 0, outline: 0, background: "transparent", width: "100%", fontSize: 14, color: c.ink };
 const chipRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 };
-const chip: React.CSSProperties = { height: 30, border: "1px solid #cfd3ca", borderRadius: 6, background: "#fff", color: "#4b5563", cursor: "pointer" };
-const chipActive: React.CSSProperties = { ...chip, borderColor: "#1d6f61", background: "#e7f2ef", color: "#145348" };
-const sortBox: React.CSSProperties = { height: 34, display: "flex", alignItems: "center", gap: 8, border: "1px solid #cfd3ca", borderRadius: 6, background: "#fff", padding: "0 9px" };
-const select: React.CSSProperties = { border: 0, outline: 0, background: "transparent", width: "100%", fontSize: 13 };
-const listWrap: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, overflowY: "auto", paddingRight: 2 };
-const itemButton: React.CSSProperties = { minHeight: 48, display: "grid", gridTemplateColumns: "44px 8px minmax(0, 1fr) 16px 16px", alignItems: "center", gap: 8, padding: "8px 9px", border: "1px solid transparent", borderRadius: 6, background: "transparent", cursor: "pointer", textAlign: "left" };
-const itemActive: React.CSSProperties = { ...itemButton, borderColor: "#a9cfc4", background: "#edf6f3" };
-const seq: React.CSSProperties = { fontVariantNumeric: "tabular-nums", fontSize: 12, color: "#6b7280" };
-const statusDot: React.CSSProperties = { width: 8, height: 8, borderRadius: 999 };
-const itemText: React.CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, color: "#1f2937" };
-const mutedLine: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, color: "#6b7280", fontSize: 13, padding: 10 };
-const empty: React.CSSProperties = { color: "#6b7280", fontSize: 13, padding: 10 };
-const workspace: React.CSSProperties = { padding: 24, minWidth: 0 };
-const errorBox: React.CSSProperties = { border: "1px solid #e2a4a4", background: "#fff1f1", color: "#9f2222", borderRadius: 6, padding: "10px 12px", marginBottom: 12, fontSize: 13 };
-const lockedBanner: React.CSSProperties = { display: "flex", alignItems: "flex-start", gap: 10, border: "1px solid #d8caa6", background: "#fff8e6", color: "#765616", borderRadius: 6, padding: "11px 12px", marginBottom: 12, fontSize: 13 };
-const emptyDetail: React.CSSProperties = { height: "calc(100vh - 48px)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#6b7280" };
-const detailHeader: React.CSSProperties = { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 10 };
-const detailTitle: React.CSSProperties = { fontSize: 22, lineHeight: 1.35, margin: 0, maxWidth: 880 };
+const chip: React.CSSProperties = { height: 32, borderRadius: radius.pill, border: `1px solid ${c.line2}`, background: "#fff", color: c.sub, fontSize: 13, fontWeight: 500, cursor: "pointer" };
+const chipActive: React.CSSProperties = { ...chip, borderColor: c.brand, background: c.brandTint, color: c.brandText, fontWeight: 600 };
+const sortBox: React.CSSProperties = { height: 36, display: "flex", alignItems: "center", gap: 8, border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", padding: "0 11px" };
+const select: React.CSSProperties = { border: 0, outline: 0, background: "transparent", width: "100%", fontSize: 13, color: c.ink };
+const listWrap: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 4, overflowY: "auto", paddingRight: 2, flex: 1, minHeight: 0 };
+const itemButton: React.CSSProperties = { minHeight: 48, display: "grid", gridTemplateColumns: "44px 8px minmax(0, 1fr) 16px 16px", alignItems: "center", gap: 8, padding: "8px 10px", border: "1px solid transparent", borderRadius: radius.control, background: "transparent", cursor: "pointer", textAlign: "left" };
+const itemActive: React.CSSProperties = { ...itemButton, borderColor: c.brandBorder, background: c.brandTint };
+const seq: React.CSSProperties = { fontVariantNumeric: "tabular-nums", fontSize: 12, color: c.faint };
+const statusDot: React.CSSProperties = { width: 8, height: 8, borderRadius: radius.pill };
+const itemText: React.CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, color: c.ink };
+const mutedLine: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, color: c.sub, fontSize: 13, padding: 10 };
+const empty: React.CSSProperties = { color: c.sub, fontSize: 13, padding: 10 };
+const workspace: React.CSSProperties = { padding: 28, minWidth: 0, height: "100vh", overflowY: "auto", background: c.soft };
+const workspaceMobile: React.CSSProperties = { padding: 16, minWidth: 0, flex: 1, minHeight: 0, overflowY: "auto", background: c.soft };
+const backButton: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 12px", marginBottom: 12, border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", color: c.ink, fontSize: 13, fontWeight: 500, cursor: "pointer" };
+const errorBox: React.CSSProperties = { border: `1px solid ${c.dangerBorder}`, background: c.dangerBg, color: c.danger, borderRadius: radius.control, padding: "11px 13px", marginBottom: 12, fontSize: 13 };
+const lockedBanner: React.CSSProperties = { display: "flex", alignItems: "flex-start", gap: 11, border: `1px solid ${c.warnBorder}`, background: c.warnBg, color: c.warnText, borderRadius: radius.control, padding: "12px 14px", marginBottom: 14, fontSize: 13 };
+const emptyDetail: React.CSSProperties = { height: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: c.sub };
+const detailHead: React.CSSProperties = { marginBottom: 16 };
+const detailTitle: React.CSSProperties = { fontSize: 21, lineHeight: 1.45, margin: "3px 0 0", maxWidth: 860, fontWeight: 700, letterSpacing: "-0.4px" };
+const stack: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 16, paddingBottom: 84 };
+const card: React.CSSProperties = { border: `1px solid ${c.line}`, borderRadius: radius.card, background: c.surface, padding: 20, boxShadow: shadow.card };
+const cardHero: React.CSSProperties = { ...card, borderColor: c.brandBorder, boxShadow: "0 1px 2px rgba(20,45,20,.05), 0 8px 26px rgba(63,145,66,.09)" };
+const cardHead: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 };
+const cardTitle: React.CSSProperties = { fontSize: 14.5, fontWeight: 700, color: c.ink, letterSpacing: "-0.2px" };
+const cardHint: React.CSSProperties = { fontSize: 12, fontWeight: 400, color: c.faint };
+const metaOk: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: c.brandText, background: c.brandTint, border: `1px solid ${c.brandBorder}`, borderRadius: 999, padding: "3px 11px" };
+const metaWarn: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: c.warnText, background: c.warnBg, border: `1px solid ${c.warnBorder}`, borderRadius: 999, padding: "3px 11px" };
+const cmp: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" };
+const cmpMobile: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr", gap: 12, alignItems: "start" };
+const cmpCol: React.CSSProperties = { display: "flex", flexDirection: "column", minWidth: 0 };
+const cmpLabel: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11.5, fontWeight: 600, color: c.sub, textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: 7 };
+const readonlyText: React.CSSProperties = { whiteSpace: "pre-wrap", lineHeight: 1.7, fontSize: 14, color: c.ink, background: c.panel, border: `1px solid ${c.line}`, borderRadius: radius.control, padding: "11px 13px" };
+const qArea: React.CSSProperties = { minHeight: 84, resize: "vertical", border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "11px 13px", font: "inherit", color: c.ink, lineHeight: 1.6, background: "#fff" };
+const aArea: React.CSSProperties = { minHeight: 180, resize: "vertical", border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "11px 13px", font: "inherit", color: c.ink, lineHeight: 1.7, background: "#fff" };
+const diffWrap: React.CSSProperties = { marginTop: 16 };
+const diffLegend: React.CSSProperties = { display: "inline-flex", gap: 8, textTransform: "none", letterSpacing: 0 };
+const legIns: React.CSSProperties = { color: c.brandText, background: c.brandTint, borderRadius: 4, padding: "0 6px", fontWeight: 600 };
+const legDel: React.CSSProperties = { color: "#a13b34", background: "#fdecea", borderRadius: 4, padding: "0 6px", fontWeight: 600 };
+const diffBox: React.CSSProperties = { whiteSpace: "pre-wrap", lineHeight: 1.8, fontSize: 14, color: c.ink, background: c.panel, border: `1px solid ${c.line}`, borderRadius: radius.control, padding: "11px 13px" };
+const diffEmpty: React.CSSProperties = { fontSize: 13, color: c.faint, background: c.panel, border: `1px dashed ${c.line2}`, borderRadius: radius.control, padding: "12px 13px" };
+const insTok: React.CSSProperties = { background: "#d6efce", color: "#1f5b21", borderRadius: 3, padding: "0 1px" };
+const delTok: React.CSSProperties = { background: "#fbd9d4", color: "#a13b34", textDecoration: "line-through", borderRadius: 3, padding: "0 1px" };
 const actions: React.CSSProperties = { display: "flex", gap: 8, flexShrink: 0 };
-const secondaryButton: React.CSSProperties = { height: 36, display: "inline-flex", alignItems: "center", gap: 7, border: "1px solid #cfd3ca", borderRadius: 6, padding: "0 12px", background: "#fff", color: "#374151", cursor: "pointer" };
-const primaryButton: React.CSSProperties = { ...secondaryButton, borderColor: "#1d6f61", background: "#1d6f61", color: "#fff" };
-const disabledButton: React.CSSProperties = { ...secondaryButton, color: "#9ca3af", background: "#eceee8", cursor: "not-allowed" };
-const statusLine: React.CSSProperties = { display: "flex", alignItems: "center", gap: 12, minHeight: 26, fontSize: 13, color: "#6b7280", marginBottom: 12 };
-const warnText: React.CSSProperties = { color: "#b45309" };
-const columns: React.CSSProperties = { display: "grid", gridTemplateColumns: "minmax(280px, 0.42fr) minmax(420px, 0.58fr)", gap: 16, alignItems: "start" };
-const panel: React.CSSProperties = { border: "1px solid #d7d9d2", borderRadius: 6, background: "#fff", padding: 16 };
-const editorPanel: React.CSSProperties = { ...panel, display: "flex", flexDirection: "column", gap: 10 };
-const panelLabel: React.CSSProperties = { fontSize: 12, color: "#6b7280", margin: "0 0 6px" };
-const readonlyText: React.CSSProperties = { whiteSpace: "pre-wrap", lineHeight: 1.65, fontSize: 14, color: "#1f2937", marginBottom: 18 };
-const fieldLabel: React.CSSProperties = { fontSize: 12, color: "#4b5563" };
-const questionArea: React.CSSProperties = { minHeight: 76, resize: "vertical", border: "1px solid #cfd3ca", borderRadius: 6, padding: 10, font: "inherit", lineHeight: 1.5 };
-const answerArea: React.CSSProperties = { minHeight: 220, resize: "vertical", border: "1px solid #cfd3ca", borderRadius: 6, padding: 10, font: "inherit", lineHeight: 1.6 };
+const actionsMobile: React.CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" };
+const secondaryButton: React.CSSProperties = { height: 38, display: "inline-flex", alignItems: "center", gap: 7, border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "0 14px", background: "#fff", color: c.ink, fontWeight: 500, cursor: "pointer" };
+const primaryButton: React.CSSProperties = { ...secondaryButton, borderColor: "transparent", background: c.brand, color: "#fff", fontWeight: 600 };
+const finalButton: React.CSSProperties = { ...secondaryButton, borderColor: "transparent", background: `linear-gradient(135deg, ${c.brand}, ${c.brandStrong})`, color: "#fff", fontWeight: 600 };
+const disabledButton: React.CSSProperties = { ...secondaryButton, color: c.faint, background: "#eef0ea", borderColor: c.line, cursor: "not-allowed" };
+const actionBar: React.CSSProperties = { position: "sticky", bottom: 0, marginTop: -68, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, background: "rgba(255,255,255,.86)", backdropFilter: "blur(8px)", borderTop: `1px solid ${c.line}`, borderRadius: `${radius.card}px ${radius.card}px 0 0`, boxShadow: "0 -6px 20px rgba(20,45,20,.06)", padding: "12px 18px" };
+const actionBarMobile: React.CSSProperties = { position: "sticky", bottom: 0, display: "flex", flexDirection: "column", alignItems: "stretch", gap: 8, background: "rgba(255,255,255,.94)", backdropFilter: "blur(8px)", borderTop: `1px solid ${c.line}`, boxShadow: "0 -6px 20px rgba(20,45,20,.06)", padding: "10px 12px", margin: "0 -16px" };
+const actionInfo: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: c.sub };
+const saveOk: React.CSSProperties = { color: c.sub };
+const saveDirty: React.CSSProperties = { color: c.warn, fontWeight: 600 };
+const sep: React.CSSProperties = { color: c.faint };
 const reasonGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(112px, 1fr))", gap: 6 };
-const reasonOff: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, minHeight: 31, border: "1px solid #cfd3ca", borderRadius: 6, padding: "5px 8px", background: "#fff", fontSize: 13 };
-const reasonOn: React.CSSProperties = { ...reasonOff, borderColor: "#1d6f61", background: "#e7f2ef", color: "#145348" };
-const noteArea: React.CSSProperties = { minHeight: 64, resize: "vertical", border: "1px solid #cfd3ca", borderRadius: 6, padding: 10, font: "inherit", lineHeight: 1.5 };
-const modalBackdrop: React.CSSProperties = { position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(17,24,39,0.36)", padding: 20, zIndex: 30 };
-const modal: React.CSSProperties = { width: "min(560px, 100%)", borderRadius: 8, background: "#fff", boxShadow: "0 24px 80px rgba(0,0,0,0.22)", padding: 20 };
+const reasonOff: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, minHeight: 32, border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "5px 9px", background: "#fff", fontSize: 13, cursor: "pointer" };
+const reasonOn: React.CSSProperties = { ...reasonOff, borderColor: c.brand, background: c.brandTint, color: c.brandText, fontWeight: 600 };
+const noteArea: React.CSSProperties = { minHeight: 64, resize: "vertical", border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: 11, font: "inherit", color: c.ink, lineHeight: 1.55, background: "#fff" };
+const modalBackdrop: React.CSSProperties = { position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(20,35,20,0.4)", padding: 20, zIndex: 30 };
+const modal: React.CSSProperties = { width: "min(560px, 100%)", borderRadius: radius.card, background: "#fff", boxShadow: shadow.pop, padding: 24 };
 const modalHeader: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "flex-start" };
-const modalTitle: React.CSSProperties = { fontSize: 20, margin: 0 };
-const modalCopy: React.CSSProperties = { color: "#4b5563", lineHeight: 1.55, fontSize: 14 };
-const modalActions: React.CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 };
+const modalTitle: React.CSSProperties = { fontSize: 20, margin: 0, fontWeight: 700, letterSpacing: "-0.3px" };
+const modalCopy: React.CSSProperties = { color: c.sub, lineHeight: 1.65, fontSize: 14 };
+const modalActions: React.CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 };
