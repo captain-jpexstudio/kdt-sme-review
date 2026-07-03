@@ -1,6 +1,10 @@
 # 배포 옵션 비교 — AWS vs 우분투+Tailscale
 
-> 상태: **결정 대기**(P6 전 확정). spec §4.2와 progress.md 미결 E가 충돌하므로 이 문서로 정리.
+> **결정(2026-07-03): 우분투 홈서버 유지 + 공개 전환.** Tailscale 전용 → **Cloudflare Tunnel**로 공개하고
+> 앞단에 **Access**(검수자 7인 이메일 인증)를 얹는다. 상세·절차는 **`deploy-cloudflare-tunnel.md`**.
+> 이 문서는 그 결정에 이르기까지의 옵션 비교(AWS vs 우분투)를 보존한다.
+>
+> 상태(과거): **결정 대기**(P6 전 확정). spec §4.2와 progress.md 미결 E가 충돌하므로 이 문서로 정리.
 > - spec §4.2: 운영 = **AWS EC2+RDS+S3** (기본값)
 > - progress.md 미결 E: 배포환경 **우분투+Tailscale** 정합 → P6 전 결정
 > - 공통 제약(spec): 자체호스팅(Vercel 아님)·보안격리, **단일 인스턴스**(§15), 일일 DB+서명/PDF 백업, Nginx(TLS).

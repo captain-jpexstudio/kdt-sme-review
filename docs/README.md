@@ -6,7 +6,8 @@
   - v2~v5 및 옛 설계(`research/검수 앱 상세 설계_윤지수.md`)를 **통합·대체**한다.
 - **`architecture.md`** — 코드 실측 기준 아키텍처(구성도·컴포넌트·API 표면·인증/가드·데이터모델·SSE/스토리지).
 - **`business-logic.md`** — 비즈니스 규칙(BR)·상태머신·Active Edit/서명/락킹·불변식·임계값·에러코드.
-- **`deploy-options.md`** — 배포 옵션 비교(AWS+Terraform vs 우분투+Tailscale). 결정 대기.
+- **`deploy-options.md`** — 배포 옵션 비교(AWS+Terraform vs 우분투+Tailscale). **결정: 우분투 유지+공개 전환**(아래).
+- **`deploy-cloudflare-tunnel.md`** — 채택 배포 런북. 우분투 홈서버 유지 + Cloudflare Tunnel(공개)+Access(검수자 인증)+도메인. 미결 E 해소 경로.
 - **`progress.md`** — 구현 진행현황(P0~P6).
 
 ## 옛 설계 대비 주요 변경 (착수 전 인지)
