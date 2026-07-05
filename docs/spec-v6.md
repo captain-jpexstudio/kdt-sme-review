@@ -160,7 +160,7 @@ erDiagram
 **users** `id`(UUID PK) · `username`(UNIQUE) · `password_hash` · `role`(admin/reviewer) · `is_agreed`(bool) · `reviewer_code`(가명 UNIQUE) · `session_version`(int) · **`is_batch_submitted`**(bool) · **`batch_submitted_at`**(ts).
 **reviewer_profiles** `user_id`(PK,FK) · `real_name_enc`(BYTEA) · `branch`(공/육/해/해병) · `rank` · `specialty` · `degree` · `email`.
 **payment_info** `user_id`(PK,FK) · `phone_enc`·`bank_name_enc`·`bank_account_enc`(BYTEA) · `purged`(bool) · `purged_at`.
-**datasets**(Immutable) `id`(PK) · `original_q`·`original_a`(TEXT) · `assigned_persona`(NULL) · `batch_id`(Idx).
+**datasets**(Immutable) `id`(PK) · `original_q`·`original_a`(TEXT) · `rationale`(TEXT·NULL, 해설 참고·읽기전용) · `assigned_persona`(NULL) · `batch_id`(Idx).
 **tasks** `id`(UUID PK) · `user_id`(FK,Idx) · `dataset_id`(FK,Idx) · `status`(pending/in_progress/completed,Idx) · `draft_q`·`draft_a` · `modified_q`·`modified_a` · `error_reasons`(JSONB) · `error_note` · `version`(int,낙관적잠금) · `last_accessed_at` · `submitted_at` · **UNIQUE(user_id,dataset_id)**.
 **signature_assets**(Immutable) `id`(PK) · `user_id`(FK) · `kind`(agreement/batch) · `storage_key` · `sha256` · `mime` · `created_at`.
 **agreement_records** `id`(PK) · `user_id`(FK) · `agreement_version` · `text_sha256` · `checkbox_states`(JSONB) · `typed_name` · `signature_asset_id`(FK) · `pledge_pdf_key` · `client_ip` · `agreed_at`.
@@ -223,6 +223,7 @@ stateDiagram-v2
 ### 7.3 상세 — 에디터(detail)
 - 헤더: `#번호` + 상태 배지 + "검증 기준: 원본 정답" 표기.
 - **원본 카드(읽기전용)**: Q/A. `user-select:none`(복사 억제 — 완전 차단 아님).
+- **해설 카드(읽기전용, 선택)**: `rationale` 있으면 질문·정답 사이에 참고용으로 표시. **편집 대상 아님**(Active Edit·검증 무관).
 - **수정 영역**: 질문(작게, 선택) + **정답(크게, 기본 포커스)**. 정답은 **원본 복사로 시작**(D9).
 - **실시간 검증 바**: 변경 단어/변경률/티어 + diff 토글.
 - **오류 사유 칩**(멀티, 대상 토글) + 메모(선택).
@@ -527,7 +528,7 @@ volumes: { pgdata: {}, sigdata: {} }
 | `MISSING_COLUMNS` | 422 | 필수 컬럼 누락 |
 
 ## 부록 B. 입력/출력 xlsx
-- **입력(최소)**: `question`,`answer`(+선택 `assigned_persona`,`batch_id`). 별칭(`질문/정답/배정페르소나`) 자동 매핑.
+- **입력(최소)**: `question`,`answer`(+선택 `rationale`,`assigned_persona`,`batch_id`). 별칭(`질문/정답/해설/배정페르소나`) 자동 매핑. `rationale`(해설)은 있으면 저장·상세화면 참고표시, 없으면 무시.
 - **Export(완료분)**: `dataset_id`,`original_q`,`original_a`,`modified_q`,`modified_a`,`error_reasons`,`error_note`,`reviewer_code`(가명),`submitted_at`. *실명·연락처·계좌 미포함.*
 
 ## 부록 C. 프로토타입 목업 (단독 실행 HTML — 목록↔상세 + 실시간 검증)
