@@ -12,6 +12,7 @@ FRONT_ONLY="${FRONT_ONLY:-0}"
 echo "▶ 코드 동기화 → $SERVER:$DIR"
 rsync -az --exclude node_modules --exclude .next --exclude '.env*' ./frontend/ "$SERVER:$DIR/frontend/"
 rsync -az ./docker-compose.yml "$SERVER:$DIR/docker-compose.yml"
+rsync -az --exclude certs ./nginx/ "$SERVER:$DIR/nginx/"
 if [ "$FRONT_ONLY" != "1" ]; then
   rsync -az --exclude __pycache__ --exclude .venv --exclude '.env*' ./backend/ "$SERVER:$DIR/backend/"
 fi
@@ -23,5 +24,8 @@ else
   echo "▶ api·web 재빌드·재기동(api 기동 시 마이그레이션 자동 적용)"
   ssh "$SERVER" "cd $DIR && docker compose up -d --build api web"
 fi
+
+echo "▶ nginx 설정 reload(마운트 볼륨 반영)"
+ssh "$SERVER" "cd $DIR && docker compose exec -T nginx nginx -s reload 2>/dev/null || docker compose restart nginx"
 
 echo "✅ 배포 완료 → https://domainxiom.com"
