@@ -386,6 +386,14 @@ export default function WorkspacePage() {
                 </div>
               </section>
 
+              {/* 해설 (참고·읽기전용) */}
+              {current.rationale && (
+                <section style={card}>
+                  <div style={cardHead}><span style={cardTitle}>해설 <span style={cardHint}>· 참고용(편집 대상 아님)</span></span></div>
+                  <div style={{ ...readonlyText, whiteSpace: "pre-wrap" }}>{current.rationale}</div>
+                </section>
+              )}
+
               {/* 정답 검수 (핵심) */}
               <section style={cardHero}>
                 <div style={cardHead}>

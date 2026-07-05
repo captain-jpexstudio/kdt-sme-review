@@ -38,6 +38,7 @@ export interface TaskDetail {
   version: number;
   original_q: string;
   original_a: string;
+  rationale: string | null;
   draft_q: string | null;
   draft_a: string | null;
   modified_q: string | null;
