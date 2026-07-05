@@ -64,6 +64,7 @@ def _detail(task: Task, ds: Dataset) -> TaskDetail:
         version=task.version,
         original_q=ds.original_q,
         original_a=ds.original_a,
+        rationale=ds.rationale,
         draft_q=task.draft_q,
         draft_a=task.draft_a,
         modified_q=task.modified_q,

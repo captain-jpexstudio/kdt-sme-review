@@ -68,6 +68,7 @@ async def upload_datasets(
             ds = Dataset(
                 original_q=str(row["question"]).strip(),
                 original_a=str(row["answer"]).strip(),
+                rationale=None if "rationale" not in df.columns else str(row.get("rationale") or "").strip() or None,
                 assigned_persona=None if "assigned_persona" not in df.columns else str(row.get("assigned_persona") or "").strip() or None,
                 batch_id=bid,
             )

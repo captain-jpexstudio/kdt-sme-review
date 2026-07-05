@@ -41,6 +41,7 @@ class TaskDetail(BaseModel):
     version: int
     original_q: str
     original_a: str
+    rationale: str | None = None
     draft_q: str | None = None
     draft_a: str | None = None
     modified_q: str | None = None

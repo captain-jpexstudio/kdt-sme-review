@@ -8,6 +8,7 @@ ALIASES = {
     "정답": "answer", "답변": "answer", "answer": "answer", "a": "answer",
     "배정페르소나": "assigned_persona", "assigned_persona": "assigned_persona",
     "persona": "assigned_persona",
+    "해설": "rationale", "rationale": "rationale", "rationale_cot": "rationale", "설명": "rationale",
 }
 
 
