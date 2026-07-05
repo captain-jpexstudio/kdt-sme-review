@@ -1,5 +1,5 @@
 "use client";
-import { Activity, BookOpen, ClipboardCheck, Download, HelpCircle, History, LayoutDashboard, LogOut, Menu, Settings, Users, X } from "lucide-react";
+import { Activity, BookOpen, ClipboardCheck, Download, HelpCircle, History, LayoutDashboard, LogOut, Menu, Settings, Upload, Users, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
@@ -17,6 +17,7 @@ const NAV: Record<"reviewer" | "admin", Item[]> = {
   ],
   admin: [
     { key: "dashboard", label: "대시보드", href: "/admin", icon: LayoutDashboard },
+    { key: "datasets", label: "데이터셋 업로드", href: "/admin/datasets", icon: Upload },
     { key: "reviewers", label: "검수자 진행률", href: "/admin/reviewers", icon: Users },
     { key: "events", label: "실시간 이벤트", href: "/admin/events", icon: Activity },
     { key: "export", label: "내보내기", icon: Download, soon: true },

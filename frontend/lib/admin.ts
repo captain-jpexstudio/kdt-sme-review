@@ -36,6 +36,27 @@ export async function getReviewers(): Promise<ReviewerProgress[]> {
   return data;
 }
 
+export interface DatasetUploadResult {
+  batch_id: string;
+  datasets: number;
+  tasks: number;
+  reviewers: number;
+  per_reviewer: number;
+}
+
+export async function uploadDataset(
+  file: File,
+  opts: { batchId?: string; perReviewer?: number } = {},
+): Promise<DatasetUploadResult> {
+  const form = new FormData();
+  form.append("file", file);
+  const params: Record<string, string | number> = {};
+  if (opts.batchId) params.batch_id = opts.batchId;
+  if (opts.perReviewer) params.per_reviewer = opts.perReviewer;
+  const { data } = await api.post<DatasetUploadResult>("/admin/datasets/upload", form, { params });
+  return data;
+}
+
 export interface SignatureInfo {
   id: number;
   kind: string; // agreement | batch
