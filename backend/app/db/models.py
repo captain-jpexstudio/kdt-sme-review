@@ -72,6 +72,7 @@ class Dataset(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     original_q: Mapped[str] = mapped_column(Text)
     original_a: Mapped[str] = mapped_column(Text)
+    rationale: Mapped[str | None] = mapped_column(Text)  # 해설(참고·읽기전용) — 검수 판단용, 편집 대상 아님
     assigned_persona: Mapped[str | None] = mapped_column(String)
     batch_id: Mapped[str | None] = mapped_column(String, index=True)
 
