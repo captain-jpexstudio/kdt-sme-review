@@ -16,6 +16,8 @@ npm-debug.log*
 # data / artifacts
 /data/
 nginx/certs/
+*.xlsx
+*.jsonl
 
 # os
 .DS_Store
