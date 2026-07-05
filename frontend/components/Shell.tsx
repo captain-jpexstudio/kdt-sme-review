@@ -12,7 +12,7 @@ type Item = { key: string; label: string; icon: typeof LayoutDashboard; href?: s
 const NAV: Record<"reviewer" | "admin", Item[]> = {
   reviewer: [
     { key: "workspace", label: "검수 워크스페이스", href: "/workspace", icon: ClipboardCheck },
-    { key: "history", label: "내 검수 이력", icon: History, soon: true },
+    { key: "history", label: "내 검수 이력", href: "/history", icon: History },
     { key: "guide", label: "검수 가이드", icon: BookOpen, soon: true },
   ],
   admin: [
