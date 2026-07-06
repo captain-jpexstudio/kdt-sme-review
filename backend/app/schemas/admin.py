@@ -37,3 +37,14 @@ class SignatureInfo(BaseModel):
     storage_key: str
     created_at: datetime
 
+
+class RejectedItem(BaseModel):
+    task_id: uuid.UUID
+    reviewer_code: str | None
+    reviewer_username: str
+    source_id: str | None = None
+    question_preview: str
+    reason: str | None = None
+    batch_id: str | None = None
+    rejected_at: datetime | None = None
+

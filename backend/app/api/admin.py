@@ -16,7 +16,7 @@ from sse_starlette.sse import EventSourceResponse
 from app.api.deps import require_admin
 from app.db.base import get_db
 from app.db.models import AgreementRecord, AuditLog, BatchSubmission, Dataset, SignatureAsset, Task, User
-from app.schemas.admin import AdminStats, ReviewerProgress, SignatureInfo
+from app.schemas.admin import AdminStats, RejectedItem, ReviewerProgress, SignatureInfo
 from app.schemas.tasks import DatasetUploadResponse
 from app.services.assignment import build_assignments, load_xlsx
 from app.services.events import broadcaster
@@ -378,3 +378,82 @@ async def final_pdf(
     if not key:
         raise HTTPException(404, {"error_code": "NOT_FOUND"})
     return Response(await storage.get(key), media_type="application/pdf")
+
+
+def _q_preview(text: str, limit: int = 80) -> str:
+    s = " ".join((text or "").split())
+    return s if len(s) <= limit else s[: limit - 1] + "…"
+
+
+@router.get("/rejected", response_model=list[RejectedItem])
+async def rejected_items(
+    batch_id: str | None = None,
+    admin: User = Depends(require_admin),  # noqa: ARG001
+    db: AsyncSession = Depends(get_db),
+):
+    """폐기(reject)된 문항 목록 — 검수자·문항번호·사유."""
+    stmt = (
+        select(Task, Dataset, User)
+        .join(Dataset, Dataset.id == Task.dataset_id)
+        .join(User, User.id == Task.user_id)
+        .where(Task.status == "rejected")
+    )
+    if batch_id:
+        stmt = stmt.where(Dataset.batch_id == batch_id)
+    stmt = stmt.order_by(Task.submitted_at.desc().nullslast())
+    rows = (await db.execute(stmt)).all()
+    return [
+        RejectedItem(
+            task_id=t.id,
+            reviewer_code=u.reviewer_code,
+            reviewer_username=u.username,
+            source_id=d.source_id,
+            question_preview=_q_preview(d.original_q),
+            reason=t.error_note,
+            batch_id=d.batch_id,
+            rejected_at=t.submitted_at,
+        )
+        for t, d, u in rows
+    ]
+
+
+@router.post("/tasks/{task_id}/restore")
+async def restore_task(
+    task_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """폐기 문항 복원 — rejected→pending. 폐기 시 자동배정된 예비 대체분이 미착수(pending·무편집)면 회수(개수 유지)."""
+    task = (await db.execute(select(Task).where(Task.id == task_id))).scalar_one_or_none()
+    if task is None or task.status != "rejected":
+        raise HTTPException(404, {"error_code": "NOT_REJECTED", "message": "폐기된 문항이 아닙니다."})
+
+    log = (
+        await db.execute(
+            select(AuditLog)
+            .where(AuditLog.action_type == "REJECT", AuditLog.details["task_id"].astext == str(task_id))
+            .order_by(AuditLog.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    recovered = False
+    if log and (log.details or {}).get("replacement_task_id"):
+        rep = (
+            await db.execute(select(Task).where(Task.id == uuid.UUID(log.details["replacement_task_id"])))
+        ).scalar_one_or_none()
+        if rep is not None and rep.status == "pending" and not rep.draft_a and not rep.modified_a:
+            await db.delete(rep)  # 예비 dataset(status=reserved) 그대로 → 다시 미배정 예비로 회수
+            recovered = True
+
+    task.status = "pending"
+    task.submitted_at = None
+    task.version += 1
+    db.add(
+        AuditLog(
+            user_id=admin.id,
+            action_type="RESTORE",
+            details={"task_id": str(task_id), "replacement_recovered": recovered},
+        )
+    )
+    await db.commit()
+    return {"ok": True, "replacement_recovered": recovered}
