@@ -3,6 +3,10 @@ import { useState } from "react";
 
 import { c, radius, shadow } from "@/lib/theme";
 
+// PAGES가 초기화 시점에 참조하므로 상단 선언(TDZ 방지).
+const para: React.CSSProperties = { fontSize: 14, lineHeight: 1.8, color: c.sub, margin: 0 };
+const quote: React.CSSProperties = { fontSize: 14.5, fontWeight: 700, color: c.brandText, background: c.brandTint, borderRadius: radius.control, padding: "12px 14px", margin: "4px 0 0", lineHeight: 1.6 };
+
 // 검수 착수 전 브리핑(수정사항 #4). 다중 페이지 → 마지막 '시작하기'.
 const PAGES: { title: string; body: React.ReactNode }[] = [
   {
@@ -136,8 +140,6 @@ const brand: React.CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacin
 const counter: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: c.faint };
 const title: React.CSSProperties = { fontSize: 20, fontWeight: 700, margin: "10px 0 16px", letterSpacing: "-0.3px", color: c.ink };
 const content: React.CSSProperties = { overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, paddingRight: 4 };
-const para: React.CSSProperties = { fontSize: 14, lineHeight: 1.8, color: c.sub, margin: 0 };
-const quote: React.CSSProperties = { fontSize: 14.5, fontWeight: 700, color: c.brandText, background: c.brandTint, borderRadius: radius.control, padding: "12px 14px", margin: "4px 0 0", lineHeight: 1.6 };
 const item: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 5, paddingLeft: 13, borderLeft: `2px solid ${c.brandBorder}` };
 const itemLabel: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: c.ink };
 const itemText: React.CSSProperties = { fontSize: 13.5, lineHeight: 1.75, color: c.sub };
