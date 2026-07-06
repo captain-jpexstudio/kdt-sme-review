@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import { diff_match_patch, DIFF_DELETE, DIFF_INSERT } from "diff-match-patch";
-import { ArrowLeft, Ban, Check, ChevronRight, Edit3, FileSignature, Filter, Loader2, Lock, RotateCcw, Save, Search } from "lucide-react";
+import { ArrowLeft, Ban, Check, ChevronRight, Edit3, FileSignature, Filter, Info, Loader2, Lock, RotateCcw, Save, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -29,6 +29,7 @@ import {
   type TaskSummary,
 } from "@/lib/tasks";
 import { useTaskStore } from "@/stores/taskStore";
+import { Briefing } from "@/components/Briefing";
 import { Shell } from "@/components/Shell";
 import { c, radius, shadow } from "@/lib/theme";
 
@@ -67,6 +68,7 @@ export default function WorkspacePage() {
   const [finalOpen, setFinalOpen] = useState(false);
   const [finalSig, setFinalSig] = useState<SignatureValue | null>(null);
   const [finalBusy, setFinalBusy] = useState(false);
+  const [briefing, setBriefing] = useState(false);
   const qRef = useRef(qDraft);
   const aRef = useRef(aDraft);
   const reasonsRef = useRef(reasons);
@@ -298,6 +300,11 @@ export default function WorkspacePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [saveDraft, submitCurrent]);
 
+  // 검수 착수 전 브리핑 — 최초 1회 자동 표시(#4).
+  useEffect(() => {
+    if (typeof window !== "undefined" && !window.localStorage.getItem("sme_briefing_v1")) setBriefing(true);
+  }, []);
+
   const toggleReason = (reason: ErrorReasonName) => {
     if (locked) return;
     setReasons((prev) => {
@@ -315,6 +322,7 @@ export default function WorkspacePage() {
 
   return (
     <Shell role="reviewer" bare>
+      {briefing && <Briefing onDone={() => { window.localStorage.setItem("sme_briefing_v1", "1"); setBriefing(false); }} />}
       <main style={page} className="ws-page" data-view={mobileView}>
       <aside style={sidebar} className="ws-sidebar">
         <div style={topbar}>
@@ -322,6 +330,9 @@ export default function WorkspacePage() {
             <div style={eyebrow}>검수 워크스페이스</div>
             <h1 style={title}>{summary.completed} / {summary.total}</h1>
           </div>
+          <button title="검수 브리핑" onClick={() => setBriefing(true)} style={iconButton}>
+            <Info size={17} />
+          </button>
           <button title="새로고침" onClick={() => Promise.all([loadSummary(), loadList()])} style={iconButton}>
             <RotateCcw size={17} />
           </button>
