@@ -11,6 +11,7 @@ const LABEL: Record<string, string> = {
   SUBMIT: "제출",
   BATCH_SUBMIT: "최종 제출",
   BATCH_UNLOCK: "잠금 해제",
+  REJECT: "폐기",
 };
 
 export default function EventsPage() {

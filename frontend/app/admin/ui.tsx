@@ -50,7 +50,7 @@ export function useAudit(onEvent?: (e: LiveEvent) => void) {
         /* malformed */
       }
     };
-    ["AUTOSAVE", "SUBMIT", "BATCH_SUBMIT", "BATCH_UNLOCK"].forEach((n) => es.addEventListener(n, onAny));
+    ["AUTOSAVE", "SUBMIT", "BATCH_SUBMIT", "BATCH_UNLOCK", "REJECT"].forEach((n) => es.addEventListener(n, onAny));
     return () => es.close();
   }, []);
   return { connected, events };
