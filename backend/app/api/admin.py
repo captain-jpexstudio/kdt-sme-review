@@ -1,4 +1,5 @@
 """Admin 라우터 — spec §12. P2 upload/assignment + P5 운영 API."""
+import ast
 import json
 import os
 import tempfile
@@ -22,6 +23,37 @@ from app.services.events import broadcaster
 from app.services.storage import storage
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _cell(df, row, col: str) -> str | None:
+    """xlsx 셀 → 정리된 문자열(없으면 None)."""
+    if col not in df.columns:
+        return None
+    v = row.get(col)
+    s = "" if v is None else str(v).strip()
+    return s if s and s.lower() != "nan" else None
+
+
+def _parse_list(v) -> list | None:
+    """JSON/파이썬 리터럴 리스트 문자열 → list(실패 시 단일원소·None)."""
+    if v is None:
+        return None
+    s = str(v).strip()
+    if not s or s.lower() == "nan":
+        return None
+    for fn in (json.loads, ast.literal_eval):
+        try:
+            r = fn(s)
+            return r if isinstance(r, list) else [r]
+        except Exception:
+            pass
+    return [s]
+
+
+def _join_list(v) -> str | None:
+    """리스트형 셀 → 줄바꿈 결합 텍스트(해설 저장용)."""
+    lst = _parse_list(v)
+    return "\n".join(str(x).strip() for x in lst if str(x).strip()) if lst else None
 
 
 @router.post("/datasets/upload", response_model=DatasetUploadResponse)
@@ -52,7 +84,13 @@ async def upload_datasets(
             tmp_path = tmp.name
         try:
             df = load_xlsx(tmp_path)
-            assignments = build_assignments(df, reviewers, per=per_reviewer)
+            status_col = (
+                df["status"].fillna("main").astype(str).str.strip().str.lower()
+                if "status" in df.columns else pd.Series(["main"] * len(df))
+            )
+            main_df = df[status_col == "main"].reset_index(drop=True)
+            # 배정·개수검증은 main 문항 기준(reserved 예비분은 배정 제외).
+            assignments = build_assignments(main_df, reviewers, per=per_reviewer)
         except ValueError as e:
             raise HTTPException(400, {"error_code": "INVALID_DATASET", "message": str(e)})
 
@@ -64,20 +102,33 @@ async def upload_datasets(
             raise HTTPException(409, {"error_code": "BATCH_EXISTS", "message": "이미 업로드된 batch_id입니다."})
 
         datasets: list[Dataset] = []
-        for _, row in df.iterrows():
+        main_datasets: list[Dataset] = []
+        for i, (_, row) in enumerate(df.iterrows()):
+            st = str(status_col.iloc[i])
             ds = Dataset(
+                source_id=_cell(df, row, "id"),
                 original_q=str(row["question"]).strip(),
                 original_a=str(row["answer"]).strip(),
-                rationale=None if "rationale" not in df.columns else str(row.get("rationale") or "").strip() or None,
-                assigned_persona=None if "assigned_persona" not in df.columns else str(row.get("assigned_persona") or "").strip() or None,
+                rationale=_join_list(row.get("rationale")) if "rationale" in df.columns else None,
+                choices=_parse_list(row.get("choices")) if "choices" in df.columns else None,
+                supporting_doctrine=_parse_list(row.get("supporting_doctrine")) if "supporting_doctrine" in df.columns else None,
+                capability_category=_cell(df, row, "capability_category"),
+                joint_domain=_cell(df, row, "joint_domain"),
+                solver=_cell(df, row, "solver"),
+                difficulty=_cell(df, row, "difficulty"),
+                question_type=_cell(df, row, "question_type"),
+                status=st,
+                assigned_persona=_cell(df, row, "assigned_persona"),
                 batch_id=bid,
             )
             db.add(ds)
             datasets.append(ds)
+            if st == "main":
+                main_datasets.append(ds)
         await db.flush()
 
         for row_idx, reviewer_id in assignments:
-            db.add(Task(user_id=reviewer_id, dataset_id=datasets[row_idx].id))
+            db.add(Task(user_id=reviewer_id, dataset_id=main_datasets[row_idx].id))
         db.add(
             AuditLog(
                 user_id=admin.id,
@@ -85,6 +136,7 @@ async def upload_datasets(
                 details={
                     "batch_id": bid,
                     "datasets": len(datasets),
+                    "reserved": len(datasets) - len(main_datasets),
                     "tasks": len(assignments),
                     "reviewers": len(reviewers),
                     "per_reviewer": per_reviewer,
@@ -96,6 +148,7 @@ async def upload_datasets(
         return DatasetUploadResponse(
             batch_id=bid,
             datasets=len(datasets),
+            reserved=len(datasets) - len(main_datasets),
             tasks=len(assignments),
             reviewers=len(reviewers),
             per_reviewer=per_reviewer,

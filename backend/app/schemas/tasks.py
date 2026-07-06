@@ -97,6 +97,7 @@ class BatchSubmitResponse(BaseModel):
 class DatasetUploadResponse(BaseModel):
     batch_id: str
     datasets: int
+    reserved: int = 0
     tasks: int
     reviewers: int
     per_reviewer: int
