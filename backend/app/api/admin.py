@@ -451,7 +451,7 @@ async def admin_tasks(
 ):
     """관리자 문항 목록 — spec §10 필터/대조. 검수자·상태·의심·오류태깅 필터 + 변경률 분포."""
     page = max(page, 1)
-    page_size = min(max(page_size, 1), 200)
+    page_size = min(max(page_size, 1), 500)  # 500 = 검수자 1인분(300) 전체를 한 페이지로
 
     stmt = (
         select(Task, Dataset, User.reviewer_code)
