@@ -144,6 +144,10 @@ export async function rejectTask(taskId: string, payload: { version: number; rea
   return data;
 }
 
+export async function savePayment(payload: { account_holder: string; bank_name: string; bank_account: string; phone?: string }): Promise<void> {
+  await api.post("/tasks/payment", payload);
+}
+
 export async function getBatchEligibility(): Promise<BatchEligibility> {
   const { data } = await api.get<BatchEligibility>("/tasks/batch/eligibility");
   return data;

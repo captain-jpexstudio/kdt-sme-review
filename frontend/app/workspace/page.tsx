@@ -30,6 +30,7 @@ import {
 } from "@/lib/tasks";
 import { useTaskStore } from "@/stores/taskStore";
 import { Briefing } from "@/components/Briefing";
+import { PaymentForm } from "@/components/PaymentForm";
 import { Shell } from "@/components/Shell";
 import { c, radius, shadow } from "@/lib/theme";
 
@@ -69,6 +70,7 @@ export default function WorkspacePage() {
   const [finalSig, setFinalSig] = useState<SignatureValue | null>(null);
   const [finalBusy, setFinalBusy] = useState(false);
   const [briefing, setBriefing] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const qRef = useRef(qDraft);
   const aRef = useRef(aDraft);
   const reasonsRef = useRef(reasons);
@@ -276,6 +278,7 @@ export default function WorkspacePage() {
       setLocked(true);
       setFinalOpen(false);
       setDirty(false);
+      setPaymentOpen(true);
       await loadSummary();
     } catch (e) {
       setError(errorText(e));
@@ -323,6 +326,7 @@ export default function WorkspacePage() {
   return (
     <Shell role="reviewer" bare>
       {briefing && <Briefing onDone={() => { window.localStorage.setItem("sme_briefing_v1", "1"); setBriefing(false); }} />}
+      {paymentOpen && <PaymentForm onDone={() => setPaymentOpen(false)} />}
       <main style={page} className="ws-page" data-view={mobileView}>
       <aside style={sidebar} className="ws-sidebar">
         <div style={topbar}>
