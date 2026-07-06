@@ -95,6 +95,13 @@ class RejectResponse(BaseModel):
     reserved_remaining: int
 
 
+class PaymentRequest(BaseModel):
+    account_holder: str  # 예금주(성명)
+    bank_name: str
+    bank_account: str
+    phone: str | None = None
+
+
 class BatchEligibility(BaseModel):
     completed: int
     total: int

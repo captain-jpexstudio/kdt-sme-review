@@ -7,13 +7,15 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import agreed_reviewer, ensure_not_locked, get_client_ip
+from app.core.crypto import encrypt
 from app.db.base import get_db
-from app.db.models import AuditLog, BatchSubmission, Dataset, Task, User
+from app.db.models import AuditLog, BatchSubmission, Dataset, PaymentInfo, ReviewerProfile, Task, User
 from app.schemas.tasks import (
     AutosaveRequest,
     BatchEligibility,
     BatchSubmitRequest,
     BatchSubmitResponse,
+    PaymentRequest,
     RejectRequest,
     RejectResponse,
     SubmitRequest,
@@ -434,3 +436,35 @@ async def reject(
         replacement_task_id=new_task.id if new_task else None,
         reserved_remaining=remaining,
     )
+
+
+@router.post("/payment")
+async def save_payment(
+    body: PaymentRequest,
+    request: Request,
+    user: User = Depends(agreed_reviewer),
+    db: AsyncSession = Depends(get_db),
+):
+    """자문료 지급용 계좌정보 저장(Fernet 암호화) — 최종 제출 후 입력(수정사항 #3)."""
+    if not (body.account_holder.strip() and body.bank_name.strip() and body.bank_account.strip()):
+        raise HTTPException(400, {"error_code": "INVALID_PAYMENT", "message": "예금주·은행명·계좌번호를 모두 입력하세요."})
+
+    pi = (await db.execute(select(PaymentInfo).where(PaymentInfo.user_id == user.id))).scalar_one_or_none()
+    if pi is None:
+        pi = PaymentInfo(user_id=user.id)
+        db.add(pi)
+    pi.bank_name_enc = encrypt(body.bank_name.strip())
+    pi.bank_account_enc = encrypt(body.bank_account.strip())
+    if body.phone and body.phone.strip():
+        pi.phone_enc = encrypt(body.phone.strip())
+    pi.purged = False
+
+    rp = (await db.execute(select(ReviewerProfile).where(ReviewerProfile.user_id == user.id))).scalar_one_or_none()
+    if rp is None:
+        rp = ReviewerProfile(user_id=user.id)
+        db.add(rp)
+    rp.real_name_enc = encrypt(body.account_holder.strip())
+
+    db.add(AuditLog(user_id=user.id, action_type="PAYMENT_INFO", details={"saved": True}, client_ip=get_client_ip(request)))
+    await db.commit()
+    return {"ok": True}
