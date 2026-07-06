@@ -19,6 +19,9 @@
 - P5 백엔드: `/admin/reviewers`, `/admin/stats`, `/admin/audit/stream`, `/admin/export`, `/admin/users/{id}/unlock`, 서명/PDF 조회 구현
 - P5 프론트: `/admin` 진행률 대시보드, SSE 이벤트 피드, Export, Unlock
 - P5 검증: Docker `api pytest -q` 6개 통과, Docker `web npm run build` 통과
+- P5 보충(2026-07-06): 최초 ✅ 표기 당시 spec §10의 **diff·필터·품질 지표가 미구현**이었음을 발견·보충
+  — BE `GET /admin/tasks`(검수자·상태·의심·오류태깅·검색 필터 + 변경률 히스토그램)·`GET /admin/tasks/{id}/diff`,
+  FE 검수자 상세 문항 목록 + 원본↔수정 단어 diff 모달 + 변경률 분포. curl로 목록/필터/diff 검증.
 - 실검증 중 잡은 버그: passlib↔bcrypt5(→4.0.1 핀), @types/react-signature-canvas 누락
 - **미검증(후속)**: 브라우저 E2E(로그인→서명→제출 클릭 흐름)은 Playwright로 P6에서. web+nginx 합본 기동도 그때.
 
