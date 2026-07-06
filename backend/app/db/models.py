@@ -67,12 +67,21 @@ class PaymentInfo(Base):
 
 
 class Dataset(Base):
-    """Immutable. 원본 Q-A."""
+    """Immutable. 원본 Q-A + 벤치마크 메타(표시·검수판단용, 읽기전용)."""
     __tablename__ = "datasets"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_id: Mapped[str | None] = mapped_column(String, index=True)  # 문항번호(00001, 00001-P). P접미사=패러프레이징
     original_q: Mapped[str] = mapped_column(Text)
     original_a: Mapped[str] = mapped_column(Text)
-    rationale: Mapped[str | None] = mapped_column(Text)  # 해설(참고·읽기전용) — 검수 판단용, 편집 대상 아님
+    rationale: Mapped[str | None] = mapped_column(Text)  # 해설(rationale_cot) — 검수 판단용, 편집 대상 아님
+    choices: Mapped[list | None] = mapped_column(JSONB)  # 선지(mcq만)
+    supporting_doctrine: Mapped[list | None] = mapped_column(JSONB)  # 관련 교리/내용
+    capability_category: Mapped[str | None] = mapped_column(String)  # 벤치마크 유형(knowledge/reasoning/math)
+    joint_domain: Mapped[str | None] = mapped_column(String)
+    solver: Mapped[str | None] = mapped_column(String)  # 대상 특기(공군(전투) 등)
+    difficulty: Mapped[str | None] = mapped_column(String)  # 난이도(L1~L4)
+    question_type: Mapped[str | None] = mapped_column(String)  # mcq | short | complex
+    status: Mapped[str] = mapped_column(String, default="main", index=True)  # main | reserved
     assigned_persona: Mapped[str | None] = mapped_column(String)
     batch_id: Mapped[str | None] = mapped_column(String, index=True)
 
