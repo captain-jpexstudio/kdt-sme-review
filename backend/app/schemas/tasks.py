@@ -39,6 +39,14 @@ class TaskDetail(BaseModel):
     dataset_id: int
     status: TaskStatus
     version: int
+    source_id: str | None = None
+    capability_category: str | None = None
+    joint_domain: str | None = None
+    solver: str | None = None
+    difficulty: str | None = None
+    question_type: str | None = None
+    choices: list[str] | None = None
+    supporting_doctrine: list[str] | None = None
     original_q: str
     original_a: str
     rationale: str | None = None
