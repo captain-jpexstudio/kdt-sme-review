@@ -163,6 +163,9 @@ export default function WorkspacePage() {
   }, [ready, loadList]);
 
   const editStats = useMemo(() => (current ? evaluateEdit(current.original_a, aDraft) : null), [current, aDraft]);
+  // 복합형(complex)만 정답 수정 필수. 단답형·객관식은 무수정 통과 허용(정답 비어있지만 않으면).
+  const requireEdit = current?.question_type === "complex";
+  const canSubmit = !!editStats && !editStats.empty && (requireEdit ? editStats.valid : true);
   const progress = summary.total ? Math.round((summary.completed / summary.total) * 100) : 0;
 
   const markDirty = () => {
@@ -204,7 +207,7 @@ export default function WorkspacePage() {
   }, [current, dirty, locked, saveDraft, saving, submitting]);
 
   const submitCurrent = useCallback(async () => {
-    if (!current || !editStats?.valid || submitting || locked) return;
+    if (!current || !canSubmit || submitting || locked) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -232,7 +235,7 @@ export default function WorkspacePage() {
     } finally {
       setSubmitting(false);
     }
-  }, [current, editStats?.valid, filter, loadDetail, locked, query, sort, submitting]);
+  }, [current, canSubmit, filter, loadDetail, locked, query, sort, submitting]);
 
   const submitBatch = useCallback(async () => {
     if (!finalSig || finalBusy || !eligibility.eligible) return;
@@ -424,7 +427,7 @@ export default function WorkspacePage() {
               {/* 정답 검수 (핵심) */}
               <section style={cardHero}>
                 <div style={cardHead}>
-                  <span style={cardTitle}>정답 검수 <span style={cardHint}>· 원본에서 최소 1단어 이상 수정해야 제출됩니다</span></span>
+                  <span style={cardTitle}>정답 검수 <span style={cardHint}>· {requireEdit ? "복합형은 최소 1단어 이상 수정해야 제출됩니다" : "확인 후 제출(수정은 선택)"}</span></span>
                   {editStats && (
                     <span style={editStats.tier === "trivial" ? metaWarn : metaOk}>
                       변경 {editStats.changed}단어 · {Math.round(editStats.ratio * 100)}%{editStats.tier === "trivial" ? " · 변경량 낮음" : ""}
@@ -495,7 +498,7 @@ export default function WorkspacePage() {
                 <button onClick={() => saveDraft()} disabled={saving || !dirty || locked} style={(saving || dirty) && !locked ? secondaryButton : disabledButton}>
                   {saving ? <Loader2 size={16} /> : <Save size={16} />} 임시저장
                 </button>
-                <button onClick={() => submitCurrent()} disabled={submitting || !editStats?.valid || locked} style={editStats?.valid && !locked ? primaryButton : disabledButton}>
+                <button onClick={() => submitCurrent()} disabled={submitting || !canSubmit || locked} style={canSubmit && !locked ? primaryButton : disabledButton}>
                   {submitting ? <Loader2 size={16} /> : <Check size={16} />} 제출
                 </button>
               </div>
