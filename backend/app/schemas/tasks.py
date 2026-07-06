@@ -84,6 +84,17 @@ class TaskMutationResponse(BaseModel):
     active_edit: dict[str, Any] | None = None
 
 
+class RejectRequest(BaseModel):
+    version: int
+    reason: str
+
+
+class RejectResponse(BaseModel):
+    rejected_task_id: uuid.UUID
+    replacement_task_id: uuid.UUID | None = None  # 예비(reserved) 대체 태스크(없으면 소진)
+    reserved_remaining: int
+
+
 class BatchEligibility(BaseModel):
     completed: int
     total: int

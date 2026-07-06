@@ -14,6 +14,8 @@ from app.schemas.tasks import (
     BatchEligibility,
     BatchSubmitRequest,
     BatchSubmitResponse,
+    RejectRequest,
+    RejectResponse,
     SubmitRequest,
     TaskDetail,
     TaskListItem,
@@ -94,7 +96,7 @@ async def summary(user: User = Depends(agreed_reviewer), db: AsyncSession = Depe
     rows = (
         await db.execute(
             select(Task.status, func.count())
-            .where(Task.user_id == user.id)
+            .where(Task.user_id == user.id, Task.status != "rejected")
             .group_by(Task.status)
         )
     ).all()
@@ -115,7 +117,7 @@ async def list_tasks(
     stmt = (
         select(Task, Dataset)
         .join(Dataset, Dataset.id == Task.dataset_id)
-        .where(Task.user_id == user.id)
+        .where(Task.user_id == user.id, Task.status != "rejected")
     )
     if status:
         stmt = stmt.where(Task.status == status)
@@ -167,7 +169,7 @@ async def resume(
         await db.execute(
             select(Task, Dataset)
             .join(Dataset, Dataset.id == Task.dataset_id)
-            .where(Task.user_id == user.id)
+            .where(Task.user_id == user.id, Task.status != "rejected")
             .order_by(
                 Task.last_accessed_at.desc().nullslast(),
                 case((Task.status == "pending", 0), else_=1),
@@ -189,7 +191,7 @@ async def _completion_counts(db: AsyncSession, user: User) -> tuple[int, int]:
     rows = (
         await db.execute(
             select(Task.status, func.count())
-            .where(Task.user_id == user.id)
+            .where(Task.user_id == user.id, Task.status != "rejected")
             .group_by(Task.status)
         )
     ).all()
@@ -361,4 +363,74 @@ async def submit(
         version=task.version,
         suspicious=active["suspicious"],
         active_edit=active,
+    )
+
+
+@router.post("/{task_id}/reject", response_model=RejectResponse)
+async def reject(
+    task_id: uuid.UUID,
+    body: RejectRequest,
+    request: Request,
+    user: User = Depends(ensure_not_locked),
+    db: AsyncSession = Depends(get_db),
+):
+    """문항 폐기(불가) — 해당 태스크를 rejected 처리하고, 같은 batch의 예비(reserved)에서 1건 자동 대체 배정."""
+    task, ds = await _owned_task_or_404(db, user, task_id)
+    _validate_version(task, body.version)
+    if not body.reason.strip():
+        raise HTTPException(400, {"error_code": "REASON_REQUIRED", "message": "폐기 사유를 입력하세요."})
+
+    now = datetime.now(timezone.utc)
+    task.status = "rejected"
+    task.error_note = body.reason.strip()
+    task.last_accessed_at = now
+    task.submitted_at = now
+    task.version += 1
+
+    # 배정 안 된 예비 문항 조건(같은 batch, status=reserved, Task 없음)
+    unassigned = ~select(Task.id).where(Task.dataset_id == Dataset.id).exists()
+    repl = (
+        await db.execute(
+            select(Dataset)
+            .where(Dataset.status == "reserved", Dataset.batch_id == ds.batch_id, unassigned)
+            .order_by(Dataset.id)
+            .limit(1)
+            .with_for_update(skip_locked=True)
+        )
+    ).scalar_one_or_none()
+
+    new_task = None
+    if repl is not None:
+        new_task = Task(user_id=user.id, dataset_id=repl.id, status="pending")
+        db.add(new_task)
+        await db.flush()
+
+    remaining = (
+        await db.execute(
+            select(func.count()).select_from(Dataset).where(
+                Dataset.status == "reserved", Dataset.batch_id == ds.batch_id, unassigned
+            )
+        )
+    ).scalar_one()
+
+    db.add(
+        AuditLog(
+            user_id=user.id,
+            action_type="REJECT",
+            details={
+                "task_id": str(task.id),
+                "dataset_id": task.dataset_id,
+                "reason": task.error_note,
+                "replacement_task_id": str(new_task.id) if new_task else None,
+                "reserved_remaining": remaining,
+            },
+            client_ip=get_client_ip(request),
+        )
+    )
+    await db.commit()
+    await broadcaster.publish({"type": "REJECT", "reviewer_code": user.reviewer_code, "task_id": str(task.id), "ts": now.isoformat()})
+    return RejectResponse(
+        rejected_task_id=task.id,
+        replacement_task_id=new_task.id if new_task else None,
+        reserved_remaining=remaining,
     )
