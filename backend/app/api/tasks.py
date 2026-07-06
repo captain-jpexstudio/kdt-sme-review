@@ -328,7 +328,7 @@ async def submit(
     task, ds = await _owned_task_or_404(db, user, task_id)
     _validate_version(task, body.version)
     try:
-        active = verify_active_edit(ds.original_a, body.modified_a)
+        active = verify_active_edit(ds.original_a, body.modified_a, ds.question_type)
     except ActiveEditError as e:
         raise HTTPException(400, {"error_code": "ACTIVE_EDIT_REQUIRED", "message": str(e)})
 

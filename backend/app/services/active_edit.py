@@ -38,11 +38,15 @@ class ActiveEditError(Exception):
     ...
 
 
-def verify_active_edit(original_a: str, modified_a: str) -> dict:
+def verify_active_edit(original_a: str, modified_a: str, question_type: str | None = None) -> dict:
+    """복합형(complex)만 정답 수정 필수. 단답형(short)·객관식(mcq)은 무수정 통과 허용(spec §7.4·수정사항 #5)."""
     s = diff_stats(original_a, modified_a)
     if s["mod_words"] == 0:
         raise ActiveEditError("정답이 비어 있습니다.")
-    if s["identical"] or s["changed_words"] < settings.MIN_WORD_CHANGES:
-        raise ActiveEditError("정답을 최소 1단어 이상 수정(패러프레이징)해야 합니다.")
-    s["suspicious"] = s["change_ratio"] < settings.SUSPICIOUS_RATIO  # 차단X, 관리자 검토
+    require_edit = (question_type or "").strip().lower() == "complex"
+    if require_edit and (s["identical"] or s["changed_words"] < settings.MIN_WORD_CHANGES):
+        raise ActiveEditError("복합형(complex) 문항은 정답을 최소 1단어 이상 수정(패러프레이징)해야 합니다.")
+    # trivial 의심은 '수정을 했는데 변경량이 적을 때'만(무수정 통과분은 의심 아님).
+    s["suspicious"] = (not s["identical"]) and s["change_ratio"] < settings.SUSPICIOUS_RATIO
+    s["require_edit"] = require_edit
     return s
