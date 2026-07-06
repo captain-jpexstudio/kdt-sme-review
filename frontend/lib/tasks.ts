@@ -133,6 +133,17 @@ export async function submitTask(taskId: string, payload: SubmitPayload): Promis
   return data;
 }
 
+export interface RejectResponse {
+  rejected_task_id: string;
+  replacement_task_id: string | null;
+  reserved_remaining: number;
+}
+
+export async function rejectTask(taskId: string, payload: { version: number; reason: string }): Promise<RejectResponse> {
+  const { data } = await api.post<RejectResponse>(`/tasks/${taskId}/reject`, payload);
+  return data;
+}
+
 export async function getBatchEligibility(): Promise<BatchEligibility> {
   const { data } = await api.get<BatchEligibility>("/tasks/batch/eligibility");
   return data;

@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import { diff_match_patch, DIFF_DELETE, DIFF_INSERT } from "diff-match-patch";
-import { ArrowLeft, Check, ChevronRight, Edit3, FileSignature, Filter, Loader2, Lock, RotateCcw, Save, Search } from "lucide-react";
+import { ArrowLeft, Ban, Check, ChevronRight, Edit3, FileSignature, Filter, Loader2, Lock, RotateCcw, Save, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -16,6 +16,7 @@ import {
   getTask,
   getTaskSummary,
   listTasks,
+  rejectTask,
   resumeTask,
   submitTask,
   type ErrorReason,
@@ -236,6 +237,33 @@ export default function WorkspacePage() {
       setSubmitting(false);
     }
   }, [current, canSubmit, filter, loadDetail, locked, query, sort, submitting]);
+
+  const rejectCurrent = useCallback(async () => {
+    if (!current || submitting || locked) return;
+    const reason = window.prompt("이 문항을 폐기(불가)합니다. 사유를 간략히 입력하세요.");
+    if (reason == null) return;
+    if (!reason.trim()) { setError("폐기 사유를 입력하세요."); return; }
+    if (!window.confirm("폐기하면 이 문항은 제외되고 예비 문항이 대체 배정됩니다. 진행할까요?")) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await rejectTask(current.task_id, { version: current.version, reason: reason.trim() });
+      const [sum, refreshed, all] = await Promise.all([
+        getTaskSummary(),
+        listTasks({ status: filter === "all" ? undefined : filter, q: query.trim() || undefined, sort }),
+        listTasks({ sort: "seq" }),
+      ]);
+      setSummary(sum);
+      setItems(refreshed);
+      if (!res.replacement_task_id) setError("예비 문항이 모두 소진되어 대체 배정되지 않았습니다.");
+      const next = all.find((item) => item.status === "pending" && item.task_id !== current.task_id) ?? all.find((item) => item.task_id !== current.task_id);
+      if (next) await loadDetail(next.task_id); else setCurrent(null);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [current, filter, loadDetail, locked, query, sort, submitting]);
 
   const submitBatch = useCallback(async () => {
     if (!finalSig || finalBusy || !eligibility.eligible) return;
@@ -495,6 +523,9 @@ export default function WorkspacePage() {
                     <FileSignature size={16} /> 최종 제출
                   </button>
                 )}
+                <button onClick={() => rejectCurrent()} disabled={submitting || locked} style={!submitting && !locked ? { ...secondaryButton, color: c.danger, borderColor: c.dangerBorder } : disabledButton}>
+                  <Ban size={16} /> 폐기(불가)
+                </button>
                 <button onClick={() => saveDraft()} disabled={saving || !dirty || locked} style={(saving || dirty) && !locked ? secondaryButton : disabledButton}>
                   {saving ? <Loader2 size={16} /> : <Save size={16} />} 임시저장
                 </button>
