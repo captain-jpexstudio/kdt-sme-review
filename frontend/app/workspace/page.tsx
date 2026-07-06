@@ -38,6 +38,8 @@ const REASONS: ErrorReasonName[] = ["문맥_어색", "오타", "사실관계_오
 const STATUS_LABEL: Record<TaskStatus, string> = { pending: "대기", in_progress: "작업중", completed: "완료" };
 const CAP_LABEL: Record<string, string> = { knowledge: "지식", reasoning: "논리", math: "수리" };
 const QTYPE_LABEL: Record<string, string> = { mcq: "객관식", short: "단답형", complex: "복합형" };
+const MARKERS = "①②③④⑤⑥⑦⑧⑨⑩";
+const markerOf = (s: string) => { const t = (s ?? "").trim(); return t && MARKERS.includes(t[0]) ? t[0] : t; };
 const FILTERS: { key: TaskFilter; label: string }[] = [
   { key: "all", label: "전체" },
   { key: "pending", label: "대기" },
@@ -171,6 +173,7 @@ export default function WorkspacePage() {
   // 복합형(complex)만 정답 수정 필수. 단답형·객관식은 무수정 통과 허용(정답 비어있지만 않으면).
   const requireEdit = current?.question_type === "complex";
   const canSubmit = !!editStats && !editStats.empty && (requireEdit ? editStats.valid : true);
+  const isMcq = !!(current && current.question_type === "mcq" && current.choices && current.choices.length > 0);
   const progress = summary.total ? Math.round((summary.completed / summary.total) * 100) : 0;
 
   const markDirty = () => {
@@ -470,35 +473,61 @@ export default function WorkspacePage() {
               {/* 정답 검수 (핵심) */}
               <section style={cardHero}>
                 <div style={cardHead}>
-                  <span style={cardTitle}>정답 검수 <span style={cardHint}>· {requireEdit ? "복합형은 최소 1단어 이상 수정해야 제출됩니다" : "확인 후 제출(수정은 선택)"}</span></span>
-                  {editStats && (
+                  <span style={cardTitle}>정답 검수 <span style={cardHint}>· {requireEdit ? "복합형은 최소 1단어 이상 수정해야 제출됩니다" : isMcq ? "올바른 보기를 선택하세요(변경 선택)" : "확인 후 제출(수정은 선택)"}</span></span>
+                  {isMcq ? (
+                    <span style={aDraft.trim() !== current.original_a.trim() ? metaWarn : metaOk}>
+                      {aDraft.trim() !== current.original_a.trim() ? `변경됨 · ${current.original_a} → ${aDraft}` : "원본과 동일"}
+                    </span>
+                  ) : editStats && (
                     <span style={editStats.tier === "trivial" ? metaWarn : metaOk}>
                       변경 {editStats.changed}단어 · {Math.round(editStats.ratio * 100)}%{editStats.tier === "trivial" ? " · 변경량 낮음" : ""}
                     </span>
                   )}
                 </div>
-                <div style={cmp} className="ws-cmp">
-                  <div style={cmpCol}>
-                    <div style={cmpLabel}>원본 정답</div>
-                    <div style={readonlyText}>{current.original_a}</div>
+                {isMcq ? (
+                  <div>
+                    <div style={cmpLabel}>정답 선택</div>
+                    <div style={mcqList}>
+                      {current.choices!.map((ch, i) => {
+                        const m = markerOf(ch);
+                        const sel = m === aDraft.trim();
+                        const orig = m === current.original_a.trim();
+                        return (
+                          <label key={i} style={sel ? mcqOptOn : mcqOpt}>
+                            <input type="radio" name="mcq-answer" checked={sel} disabled={locked} onChange={() => { setADraft(m); markDirty(); }} />
+                            <span style={{ flex: 1 }}>{ch}</span>
+                            {orig && <span style={origTag}>원본</span>}
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div style={cmpCol}>
-                    <div style={cmpLabel}>수정 정답</div>
-                    <textarea
-                      value={aDraft}
-                      onChange={(e) => { setADraft(e.target.value); markDirty(); }}
-                      disabled={locked}
-                      style={aArea}
-                    />
-                  </div>
-                </div>
-                <div style={diffWrap}>
-                  <div style={cmpLabel}>
-                    변경 미리보기
-                    <span style={diffLegend}><span style={legIns}>추가</span><span style={legDel}>삭제</span></span>
-                  </div>
-                  <InlineDiff original={current.original_a} edited={aDraft} />
-                </div>
+                ) : (
+                  <>
+                    <div style={cmp} className="ws-cmp">
+                      <div style={cmpCol}>
+                        <div style={cmpLabel}>원본 정답</div>
+                        <div style={readonlyText}>{current.original_a}</div>
+                      </div>
+                      <div style={cmpCol}>
+                        <div style={cmpLabel}>수정 정답</div>
+                        <textarea
+                          value={aDraft}
+                          onChange={(e) => { setADraft(e.target.value); markDirty(); }}
+                          disabled={locked}
+                          style={aArea}
+                        />
+                      </div>
+                    </div>
+                    <div style={diffWrap}>
+                      <div style={cmpLabel}>
+                        변경 미리보기
+                        <span style={diffLegend}><span style={legIns}>추가</span><span style={legDel}>삭제</span></span>
+                      </div>
+                      <InlineDiff original={current.original_a} edited={aDraft} />
+                    </div>
+                  </>
+                )}
               </section>
 
               {/* 오류 유형 · 메모 */}
@@ -676,6 +705,10 @@ const choiceList: React.CSSProperties = { display: "flex", flexDirection: "colum
 const choiceItem: React.CSSProperties = { fontSize: 14, color: c.ink, background: c.panel, border: `1px solid ${c.line}`, borderRadius: radius.control, padding: "9px 12px" };
 const doctrineList: React.CSSProperties = { margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6 };
 const doctrineItem: React.CSSProperties = { fontSize: 13.5, lineHeight: 1.6, color: c.ink };
+const mcqList: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 8 };
+const mcqOpt: React.CSSProperties = { display: "flex", alignItems: "center", gap: 11, padding: "12px 14px", border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", fontSize: 14, color: c.ink, cursor: "pointer" };
+const mcqOptOn: React.CSSProperties = { ...mcqOpt, border: `1.5px solid ${c.brand}`, background: c.brandTint, fontWeight: 600 };
+const origTag: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: c.sub, background: c.panel, border: `1px solid ${c.line}`, borderRadius: 999, padding: "2px 8px", flexShrink: 0 };
 const qArea: React.CSSProperties = { flex: 1, minHeight: 96, resize: "vertical", border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "11px 13px", font: "inherit", color: c.ink, lineHeight: 1.6, background: "#fff" };
 const aArea: React.CSSProperties = { flex: 1, minHeight: 180, resize: "vertical", border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "11px 13px", font: "inherit", color: c.ink, lineHeight: 1.7, background: "#fff" };
 const diffWrap: React.CSSProperties = { marginTop: 16 };
