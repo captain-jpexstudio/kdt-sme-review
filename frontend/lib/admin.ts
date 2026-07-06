@@ -95,6 +95,85 @@ export async function getReviewerSignatures(userId: string): Promise<SignatureIn
   return data;
 }
 
+export interface AdminTaskItem {
+  task_id: string;
+  user_id: string;
+  reviewer_code: string | null;
+  dataset_id: number;
+  source_id: string | null;
+  question_type: string | null;
+  q_preview: string;
+  status: string;
+  edited: boolean;
+  q_changed: boolean;
+  change_ratio: number | null;
+  suspicious: boolean;
+  tagged: boolean;
+  submitted_at: string | null;
+  last_accessed_at: string | null;
+}
+
+export interface AdminTaskList {
+  items: AdminTaskItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  ratio_histogram: number[];
+  suspicious_total: number;
+}
+
+export interface AdminTaskFilters {
+  userId?: string;
+  status?: string;
+  suspicious?: boolean;
+  tagged?: boolean;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function getAdminTasks(f: AdminTaskFilters = {}): Promise<AdminTaskList> {
+  const params: Record<string, string | number | boolean> = {};
+  if (f.userId) params.user_id = f.userId;
+  if (f.status) params.status = f.status;
+  if (f.suspicious !== undefined) params.suspicious = f.suspicious;
+  if (f.tagged !== undefined) params.tagged = f.tagged;
+  if (f.q) params.q = f.q;
+  if (f.page) params.page = f.page;
+  if (f.pageSize) params.page_size = f.pageSize;
+  const { data } = await api.get<AdminTaskList>("/admin/tasks", { params });
+  return data;
+}
+
+export interface DiffSide {
+  original: string;
+  modified: string | null;
+  changed_words: number;
+  change_ratio: number;
+  identical: boolean;
+}
+
+export interface AdminTaskDiff {
+  task_id: string;
+  reviewer_code: string | null;
+  status: string;
+  question_type: string | null;
+  source_id: string | null;
+  question: DiffSide;
+  answer: DiffSide;
+  suspicious: boolean;
+  choices: string[] | null;
+  rationale: string | null;
+  error_reasons: { target?: string; reason?: string }[] | null;
+  error_note: string | null;
+  submitted_at: string | null;
+}
+
+export async function getTaskDiff(taskId: string): Promise<AdminTaskDiff> {
+  const { data } = await api.get<AdminTaskDiff>(`/admin/tasks/${taskId}/diff`);
+  return data;
+}
+
 function apiBase(): string {
   return process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost/api/v1";
 }

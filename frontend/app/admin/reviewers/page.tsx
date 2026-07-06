@@ -16,6 +16,7 @@ import {
 import { Shell } from "@/components/Shell";
 import { c, radius, shadow } from "@/lib/theme";
 import { S, useAdminGuard, useAudit } from "../ui";
+import { TasksPanel } from "./tasks-panel";
 
 export default function ReviewersPage() {
   const ready = useAdminGuard();
@@ -138,6 +139,8 @@ export default function ReviewersPage() {
                   <LockOpen size={15} /> 잠금 해제
                 </button>
               </div>
+
+              <TasksPanel userId={cur.user_id} />
 
               <div style={sigWrap}>
                 <div style={sigTitle}><PenLine size={15} /> 서명 증빙</div>
