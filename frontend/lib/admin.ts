@@ -69,6 +69,27 @@ export async function unlockReviewer(userId: string): Promise<void> {
   await api.post(`/admin/users/${userId}/unlock`);
 }
 
+export interface RejectedItem {
+  task_id: string;
+  reviewer_code: string | null;
+  reviewer_username: string;
+  source_id: string | null;
+  question_preview: string;
+  reason: string | null;
+  batch_id: string | null;
+  rejected_at: string | null;
+}
+
+export async function getRejected(batchId?: string): Promise<RejectedItem[]> {
+  const { data } = await api.get<RejectedItem[]>("/admin/rejected", { params: batchId ? { batch_id: batchId } : {} });
+  return data;
+}
+
+export async function restoreTask(taskId: string): Promise<{ ok: boolean; replacement_recovered: boolean }> {
+  const { data } = await api.post<{ ok: boolean; replacement_recovered: boolean }>(`/admin/tasks/${taskId}/restore`);
+  return data;
+}
+
 export async function getReviewerSignatures(userId: string): Promise<SignatureInfo[]> {
   const { data } = await api.get<SignatureInfo[]>(`/admin/users/${userId}/signatures`);
   return data;
