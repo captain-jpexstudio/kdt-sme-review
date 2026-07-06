@@ -33,6 +33,8 @@ import { c, radius, shadow } from "@/lib/theme";
 
 const REASONS: ErrorReasonName[] = ["문맥_어색", "오타", "사실관계_오류", "전문용어_오용", "중복", "기타", "이상없음"];
 const STATUS_LABEL: Record<TaskStatus, string> = { pending: "대기", in_progress: "작업중", completed: "완료" };
+const CAP_LABEL: Record<string, string> = { knowledge: "지식", reasoning: "논리", math: "수리" };
+const QTYPE_LABEL: Record<string, string> = { mcq: "객관식", short: "단답형", complex: "복합형" };
 const FILTERS: { key: TaskFilter; label: string }[] = [
   { key: "all", label: "전체" },
   { key: "pending", label: "대기" },
@@ -363,6 +365,13 @@ export default function WorkspacePage() {
             <div style={detailHead}>
               <div style={eyebrow}>#{current.dataset_id} · {STATUS_LABEL[current.status]} · v{current.version}</div>
               <h2 style={detailTitle}>{current.original_q}</h2>
+              <div style={metaRow}>
+                {current.source_id && <span style={metaChip}>문항 {current.source_id}</span>}
+                {current.source_id?.includes("-P") && <span style={paraChip}>패러프레이징</span>}
+                {current.capability_category && <span style={metaChip}>{CAP_LABEL[current.capability_category] ?? current.capability_category}</span>}
+                {current.question_type && <span style={metaChip}>{QTYPE_LABEL[current.question_type] ?? current.question_type}</span>}
+                {current.difficulty && <span style={metaChip}>난이도 {current.difficulty}</span>}
+              </div>
             </div>
 
             <div style={stack}>
@@ -384,6 +393,14 @@ export default function WorkspacePage() {
                     />
                   </div>
                 </div>
+                {current.choices && current.choices.length > 0 && (
+                  <div style={choiceWrap}>
+                    <div style={cmpLabel}>선지</div>
+                    <ul style={choiceList}>
+                      {current.choices.map((ch, i) => <li key={i} style={choiceItem}>{ch}</li>)}
+                    </ul>
+                  </div>
+                )}
               </section>
 
               {/* 해설 (참고·읽기전용) */}
@@ -391,6 +408,16 @@ export default function WorkspacePage() {
                 <section style={card}>
                   <div style={cardHead}><span style={cardTitle}>해설 <span style={cardHint}>· 참고용(편집 대상 아님)</span></span></div>
                   <div style={{ ...readonlyText, whiteSpace: "pre-wrap" }}>{current.rationale}</div>
+                </section>
+              )}
+
+              {/* 관련 교리/내용 (참고·읽기전용) */}
+              {current.supporting_doctrine && current.supporting_doctrine.length > 0 && (
+                <section style={card}>
+                  <div style={cardHead}><span style={cardTitle}>관련 교리/내용 <span style={cardHint}>· 참고용</span></span></div>
+                  <ul style={doctrineList}>
+                    {current.supporting_doctrine.map((d, i) => <li key={i} style={doctrineItem}>{d}</li>)}
+                  </ul>
                 </section>
               )}
 
@@ -592,6 +619,14 @@ const cmp: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1f
 const cmpCol: React.CSSProperties = { display: "flex", flexDirection: "column", minWidth: 0, height: "100%" };
 const cmpLabel: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11.5, fontWeight: 600, color: c.sub, textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: 7 };
 const readonlyText: React.CSSProperties = { flex: 1, minHeight: 0, whiteSpace: "pre-wrap", lineHeight: 1.7, fontSize: 14, color: c.ink, background: c.panel, border: `1px solid ${c.line}`, borderRadius: radius.control, padding: "11px 13px" };
+const metaRow: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 };
+const metaChip: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: c.sub, background: c.panel, border: `1px solid ${c.line}`, borderRadius: 999, padding: "3px 10px" };
+const paraChip: React.CSSProperties = { ...metaChip, color: c.brandText, background: c.brandTint, borderColor: c.brandBorder };
+const choiceWrap: React.CSSProperties = { marginTop: 14 };
+const choiceList: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, margin: 0, padding: 0, listStyle: "none" };
+const choiceItem: React.CSSProperties = { fontSize: 14, color: c.ink, background: c.panel, border: `1px solid ${c.line}`, borderRadius: radius.control, padding: "9px 12px" };
+const doctrineList: React.CSSProperties = { margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6 };
+const doctrineItem: React.CSSProperties = { fontSize: 13.5, lineHeight: 1.6, color: c.ink };
 const qArea: React.CSSProperties = { flex: 1, minHeight: 96, resize: "vertical", border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "11px 13px", font: "inherit", color: c.ink, lineHeight: 1.6, background: "#fff" };
 const aArea: React.CSSProperties = { flex: 1, minHeight: 180, resize: "vertical", border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "11px 13px", font: "inherit", color: c.ink, lineHeight: 1.7, background: "#fff" };
 const diffWrap: React.CSSProperties = { marginTop: 16 };

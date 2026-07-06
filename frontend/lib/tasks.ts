@@ -36,6 +36,14 @@ export interface TaskDetail {
   dataset_id: number;
   status: TaskStatus;
   version: number;
+  source_id: string | null;
+  capability_category: string | null;
+  joint_domain: string | null;
+  solver: string | null;
+  difficulty: string | null;
+  question_type: string | null;
+  choices: string[] | null;
+  supporting_doctrine: string[] | null;
   original_q: string;
   original_a: string;
   rationale: string | null;
