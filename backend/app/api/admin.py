@@ -447,6 +447,10 @@ async def restore_task(
 
     task.status = "pending"
     task.submitted_at = None
+    task.error_note = None        # 폐기 사유 제거(복원 후 검수자 메모에 잔존 방지)
+    task.error_reasons = None
+    task.draft_q = None
+    task.draft_a = None
     task.version += 1
     db.add(
         AuditLog(
