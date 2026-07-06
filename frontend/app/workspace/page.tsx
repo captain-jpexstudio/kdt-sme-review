@@ -475,7 +475,7 @@ export default function WorkspacePage() {
                 <div style={cardHead}>
                   <span style={cardTitle}>정답 검수 <span style={cardHint}>· {requireEdit ? "복합형은 최소 1단어 이상 수정해야 제출됩니다" : isMcq ? "올바른 보기를 선택하세요(변경 선택)" : "확인 후 제출(수정은 선택)"}</span></span>
                   {isMcq ? (
-                    <span style={aDraft.trim() !== current.original_a.trim() ? metaWarn : metaOk}>
+                    <span style={aDraft.trim() !== current.original_a.trim() ? mcqChanged : mcqSame}>
                       {aDraft.trim() !== current.original_a.trim() ? `변경됨 · ${current.original_a} → ${aDraft}` : "원본과 동일"}
                     </span>
                   ) : editStats && (
@@ -494,9 +494,10 @@ export default function WorkspacePage() {
                         const orig = m === current.original_a.trim();
                         return (
                           <label key={i} style={sel ? mcqOptOn : mcqOpt}>
-                            <input type="radio" name="mcq-answer" checked={sel} disabled={locked} onChange={() => { setADraft(m); markDirty(); }} />
+                            <input type="radio" name="mcq-answer" checked={sel} disabled={locked} onChange={() => { setADraft(m); markDirty(); }} style={{ accentColor: c.brand, width: 17, height: 17 }} />
                             <span style={{ flex: 1 }}>{ch}</span>
-                            {orig && <span style={origTag}>원본</span>}
+                            {orig && <span style={origTag}>원본 정답</span>}
+                            {sel && <Check size={17} color={c.brand} strokeWidth={2.6} />}
                           </label>
                         );
                       })}
@@ -705,10 +706,12 @@ const choiceList: React.CSSProperties = { display: "flex", flexDirection: "colum
 const choiceItem: React.CSSProperties = { fontSize: 14, color: c.ink, background: c.panel, border: `1px solid ${c.line}`, borderRadius: radius.control, padding: "9px 12px" };
 const doctrineList: React.CSSProperties = { margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6 };
 const doctrineItem: React.CSSProperties = { fontSize: 13.5, lineHeight: 1.6, color: c.ink };
-const mcqList: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 8 };
-const mcqOpt: React.CSSProperties = { display: "flex", alignItems: "center", gap: 11, padding: "12px 14px", border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", fontSize: 14, color: c.ink, cursor: "pointer" };
-const mcqOptOn: React.CSSProperties = { ...mcqOpt, border: `1.5px solid ${c.brand}`, background: c.brandTint, fontWeight: 600 };
-const origTag: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: c.sub, background: c.panel, border: `1px solid ${c.line}`, borderRadius: 999, padding: "2px 8px", flexShrink: 0 };
+const mcqList: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 9 };
+const mcqOpt: React.CSSProperties = { display: "flex", alignItems: "center", gap: 12, padding: "13px 15px", border: `1.5px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", fontSize: 14.5, color: c.ink, cursor: "pointer", transition: "all .12s" };
+const mcqOptOn: React.CSSProperties = { ...mcqOpt, border: `2px solid ${c.brand}`, background: c.brandTint, fontWeight: 700, color: c.brandText, boxShadow: `0 0 0 3px ${c.brandTint}` };
+const origTag: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#fff", background: c.info, borderRadius: 999, padding: "3px 10px", flexShrink: 0, letterSpacing: "-0.2px" };
+const mcqSame: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: c.sub, background: c.panel, border: `1px solid ${c.line2}`, borderRadius: 999, padding: "4px 12px" };
+const mcqChanged: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: c.warnText, background: c.warnBg, border: `1.5px solid ${c.warnBorder}`, borderRadius: 999, padding: "4px 12px" };
 const qArea: React.CSSProperties = { flex: 1, minHeight: 96, resize: "vertical", border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "11px 13px", font: "inherit", color: c.ink, lineHeight: 1.6, background: "#fff" };
 const aArea: React.CSSProperties = { flex: 1, minHeight: 180, resize: "vertical", border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "11px 13px", font: "inherit", color: c.ink, lineHeight: 1.7, background: "#fff" };
 const diffWrap: React.CSSProperties = { marginTop: 16 };
