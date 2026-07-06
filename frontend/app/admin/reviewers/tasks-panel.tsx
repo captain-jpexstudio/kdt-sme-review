@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, ChevronLeft, ChevronRight, ListChecks, Search, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, ExternalLink, ListChecks, Search, X } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -82,7 +83,8 @@ const FILTERS: { key: QuickFilter; label: string }[] = [
   { key: "tagged", label: "오류 태깅" },
 ];
 
-export function TasksPanel({ userId }: { userId: string }) {
+// full 모드(전용 페이지): 전체를 한 페이지로 로드, 검수자 컬럼 표시
+export function TasksPanel({ userId, full = false }: { userId?: string; full?: boolean }) {
   const [filter, setFilter] = useState<QuickFilter>("all");
   const [q, setQ] = useState("");
   const [qInput, setQInput] = useState("");
@@ -91,6 +93,7 @@ export function TasksPanel({ userId }: { userId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [diff, setDiff] = useState<AdminTaskDiff | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
+  const pageSize = full ? 500 : PAGE_SIZE;
 
   const load = useCallback(async () => {
     setError(null);
@@ -103,13 +106,13 @@ export function TasksPanel({ userId }: { userId: string }) {
           tagged: filter === "tagged" ? true : undefined,
           q: q || undefined,
           page,
-          pageSize: PAGE_SIZE,
+          pageSize,
         }),
       );
     } catch {
       setError("문항 목록을 불러오지 못했습니다.");
     }
-  }, [userId, filter, q, page]);
+  }, [userId, filter, q, page, pageSize]);
 
   useEffect(() => {
     load();
@@ -135,11 +138,18 @@ export function TasksPanel({ userId }: { userId: string }) {
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
   const histMax = data ? Math.max(1, ...data.ratio_histogram) : 1;
+  const cols = full && !userId ? gridColsWithReviewer : gridCols;
 
   return (
-    <div style={wrap}>
+    <div style={full ? wrapFull : wrap}>
       <div style={head}>
-        <div style={title}><ListChecks size={15} /> 문항 목록</div>
+        {full ? (
+          <div style={title}><ListChecks size={15} /> 문항 목록 {data && <span style={{ fontWeight: 400, color: c.sub }}>총 {data.total}건</span>}</div>
+        ) : (
+          <Link href={`/admin/tasks${userId ? `?user=${userId}` : ""}`} style={{ ...title, textDecoration: "none" }} title="전용 페이지에서 전체 보기">
+            <ListChecks size={15} /> 문항 목록 <ExternalLink size={13} style={{ color: c.faint }} />
+          </Link>
+        )}
         <div style={searchBox}>
           <Search size={13} style={{ color: c.faint }} />
           <input
@@ -182,7 +192,8 @@ export function TasksPanel({ userId }: { userId: string }) {
 
       {error && <div style={S.errorBox}>{error}</div>}
 
-      <div style={tableHead}>
+      <div style={{ ...tableHead, gridTemplateColumns: cols }}>
+        {full && !userId && <span>검수자</span>}
         <span>문항</span>
         <span>미리보기</span>
         <span>상태</span>
@@ -191,7 +202,8 @@ export function TasksPanel({ userId }: { userId: string }) {
       </div>
       {(data?.items ?? []).length === 0 && <div style={S.empty}>조건에 맞는 문항이 없습니다.</div>}
       {(data?.items ?? []).map((t) => (
-        <button key={t.task_id} onClick={() => openDiff(t)} style={rowBtn} className="adm-task-row">
+        <button key={t.task_id} onClick={() => openDiff(t)} style={{ ...rowBtn, gridTemplateColumns: cols }} className="adm-task-row">
+          {full && !userId && <span style={{ fontSize: 12, fontWeight: 600, color: c.sub }}>{t.reviewer_code ?? "-"}</span>}
           <span style={{ fontFamily: "monospace", fontSize: 12, color: c.sub }}>{t.source_id ?? `#${t.dataset_id}`}</span>
           <span style={previewCell}>
             {t.q_preview}
@@ -209,11 +221,18 @@ export function TasksPanel({ userId }: { userId: string }) {
         </button>
       ))}
 
-      {data && data.total > PAGE_SIZE && (
+      {data && data.total > pageSize && (
         <div style={pager}>
           <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} style={page <= 1 ? pagerBtnOff : pagerBtn}><ChevronLeft size={15} /></button>
-          <span style={{ fontSize: 12.5, color: c.sub }}>{page} / {totalPages} · 총 {data.total}건</span>
+          {pageNumbers(page, totalPages).map((n, i) =>
+            n === "…" ? (
+              <span key={`e${i}`} style={{ color: c.faint, padding: "0 2px" }}>…</span>
+            ) : (
+              <button key={n} onClick={() => setPage(n)} style={n === page ? pageNumOn : pageNum}>{n}</button>
+            ),
+          )}
           <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} style={page >= totalPages ? pagerBtnOff : pagerBtn}><ChevronRight size={15} /></button>
+          <span style={{ fontSize: 12, color: c.faint, marginLeft: 6 }}>총 {data.total}건</span>
         </div>
       )}
 
@@ -299,8 +318,23 @@ function DiffSection({ label, side }: { label: string; side: AdminTaskDiff["ques
   );
 }
 
+// 번호 페이지네이션 — 현재 페이지 주변 ±2 + 처음/끝, 사이는 생략(…)
+function pageNumbers(cur: number, total: number): (number | "…")[] {
+  if (total <= 9) return Array.from({ length: total }, (_, i) => i + 1);
+  const set = new Set<number>([1, total]);
+  for (let n = cur - 2; n <= cur + 2; n++) if (n >= 1 && n <= total) set.add(n);
+  const sorted = [...set].sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - (sorted[i - 1] as number) > 1) out.push("…");
+    out.push(n);
+  });
+  return out;
+}
+
 // ---- styles ----
 const wrap: React.CSSProperties = { marginTop: 18, paddingTop: 16, borderTop: `1px solid ${c.line}` };
+const wrapFull: React.CSSProperties = {};
 const head: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 };
 const title: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 700, color: c.ink };
 const searchBox: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "5px 9px", background: "#fff" };
@@ -315,6 +349,7 @@ const chips: React.CSSProperties = { display: "flex", gap: 6, flexWrap: "wrap", 
 const chip: React.CSSProperties = { fontSize: 12, fontWeight: 500, color: c.sub, background: "#fff", border: `1px solid ${c.line2}`, borderRadius: 999, padding: "4px 11px", cursor: "pointer" };
 const chipOn: React.CSSProperties = { ...chip, color: c.brandText, background: c.brandTint, borderColor: c.brandBorder, fontWeight: 600 };
 const gridCols = "90px minmax(0,1fr) 64px 62px 96px";
+const gridColsWithReviewer = "76px 90px minmax(0,1fr) 64px 62px 96px";
 const tableHead: React.CSSProperties = { display: "grid", gridTemplateColumns: gridCols, gap: 10, fontSize: 12, fontWeight: 600, color: c.sub, padding: "8px 10px", borderBottom: `1px solid ${c.line}` };
 const rowBtn: React.CSSProperties = { display: "grid", gridTemplateColumns: gridCols, gap: 10, alignItems: "center", textAlign: "left", width: "100%", fontSize: 13, color: c.ink, background: "transparent", border: "none", borderBottom: `1px solid ${c.line}`, padding: "9px 10px", cursor: "pointer" };
 const previewCell: React.CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
@@ -330,6 +365,8 @@ const statusCell = (s: string): React.CSSProperties => ({
 const pager: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "12px 0 2px" };
 const pagerBtn: React.CSSProperties = { display: "flex", alignItems: "center", border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", padding: "4px 8px", cursor: "pointer", color: c.ink };
 const pagerBtnOff: React.CSSProperties = { ...pagerBtn, color: c.faint, cursor: "default", opacity: 0.5 };
+const pageNum: React.CSSProperties = { minWidth: 30, border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", padding: "4px 7px", cursor: "pointer", color: c.ink, fontSize: 12.5 };
+const pageNumOn: React.CSSProperties = { ...pageNum, background: c.brand, borderColor: c.brand, color: "#fff", fontWeight: 700, cursor: "default" };
 const overlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(15,20,25,.42)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 24 };
 const modal: React.CSSProperties = { width: "min(980px, 100%)", maxHeight: "86vh", overflowY: "auto", background: "#fff", borderRadius: radius.card, boxShadow: shadow.pop, padding: "20px 24px 24px" };
 const modalHead: React.CSSProperties = { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 };
