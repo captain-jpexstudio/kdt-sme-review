@@ -38,6 +38,58 @@ class SignatureInfo(BaseModel):
     created_at: datetime
 
 
+class AdminTaskItem(BaseModel):
+    task_id: uuid.UUID
+    user_id: uuid.UUID
+    reviewer_code: str | None
+    dataset_id: int
+    source_id: str | None = None
+    question_type: str | None = None
+    q_preview: str
+    status: str
+    edited: bool
+    q_changed: bool
+    change_ratio: float | None = None
+    suspicious: bool
+    tagged: bool
+    submitted_at: datetime | None = None
+    last_accessed_at: datetime | None = None
+
+
+class AdminTaskList(BaseModel):
+    items: list[AdminTaskItem]
+    total: int
+    page: int
+    page_size: int
+    # 완료분 정답 변경률 분포(필터 적용·페이지네이션 이전 전체) — 0~10%,…,80~90%,90%+ 10구간
+    ratio_histogram: list[int]
+    suspicious_total: int
+
+
+class DiffSide(BaseModel):
+    original: str
+    modified: str | None = None
+    changed_words: int = 0
+    change_ratio: float = 0.0
+    identical: bool = True
+
+
+class AdminTaskDiff(BaseModel):
+    task_id: uuid.UUID
+    reviewer_code: str | None
+    status: str
+    question_type: str | None = None
+    source_id: str | None = None
+    question: DiffSide
+    answer: DiffSide
+    suspicious: bool
+    choices: list | None = None
+    rationale: str | None = None
+    error_reasons: list | None = None
+    error_note: str | None = None
+    submitted_at: datetime | None = None
+
+
 class RejectedItem(BaseModel):
     task_id: uuid.UUID
     reviewer_code: str | None

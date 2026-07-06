@@ -14,10 +14,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import require_admin
+from app.core.config import settings
 from app.db.base import get_db
 from app.db.models import AgreementRecord, AuditLog, BatchSubmission, Dataset, SignatureAsset, Task, User
-from app.schemas.admin import AdminStats, RejectedItem, ReviewerProgress, SignatureInfo
+from app.schemas.admin import (
+    AdminStats,
+    AdminTaskDiff,
+    AdminTaskItem,
+    AdminTaskList,
+    DiffSide,
+    RejectedItem,
+    ReviewerProgress,
+    SignatureInfo,
+)
 from app.schemas.tasks import DatasetUploadResponse
+from app.services.active_edit import diff_stats
 from app.services.assignment import build_assignments, load_xlsx
 from app.services.events import broadcaster
 from app.services.storage import storage
@@ -415,6 +426,144 @@ async def rejected_items(
         )
         for t, d, u in rows
     ]
+
+
+def _task_edit_stats(dataset: Dataset, task: Task) -> tuple[str | None, dict | None]:
+    """검토 대상 정답(제출본 우선, 없으면 임시저장본)과 원본 대비 diff 통계."""
+    answer = task.modified_a or task.draft_a
+    if not answer:
+        return None, None
+    return answer, diff_stats(dataset.original_a, answer)
+
+
+@router.get("/tasks", response_model=AdminTaskList)
+async def admin_tasks(
+    user_id: uuid.UUID | None = None,
+    status: str | None = None,
+    suspicious: bool | None = None,
+    tagged: bool | None = None,
+    batch_id: str | None = None,
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    admin: User = Depends(require_admin),  # noqa: ARG001
+    db: AsyncSession = Depends(get_db),
+):
+    """관리자 문항 목록 — spec §10 필터/대조. 검수자·상태·의심·오류태깅 필터 + 변경률 분포."""
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 200)
+
+    stmt = (
+        select(Task, Dataset, User.reviewer_code)
+        .join(Dataset, Dataset.id == Task.dataset_id)
+        .join(User, User.id == Task.user_id)
+        .where(User.role == "reviewer")
+        .order_by(User.reviewer_code, Dataset.id)
+    )
+    if user_id:
+        stmt = stmt.where(Task.user_id == user_id)
+    if status:
+        stmt = stmt.where(Task.status == status)
+    if batch_id:
+        stmt = stmt.where(Dataset.batch_id == batch_id)
+    if q:
+        stmt = stmt.where(Dataset.original_q.ilike(f"%{q}%"))
+    rows = (await db.execute(stmt)).all()
+
+    items: list[AdminTaskItem] = []
+    histogram = [0] * 10
+    for t, d, code in rows:
+        answer, stats = _task_edit_stats(d, t)
+        edited = bool(stats and not stats["identical"])
+        ratio = stats["change_ratio"] if stats else None
+        is_suspicious = bool(edited and ratio is not None and ratio < settings.SUSPICIOUS_RATIO)
+        is_tagged = bool(t.error_reasons) or bool(t.error_note)
+        if suspicious is not None and is_suspicious != suspicious:
+            continue
+        if tagged is not None and is_tagged != tagged:
+            continue
+        q_changed = bool(t.modified_q or t.draft_q) and not diff_stats(d.original_q, t.modified_q or t.draft_q)["identical"]
+        if t.status == "completed" and ratio is not None:
+            histogram[min(int(ratio * 10), 9)] += 1
+        items.append(
+            AdminTaskItem(
+                task_id=t.id,
+                user_id=t.user_id,
+                reviewer_code=code,
+                dataset_id=d.id,
+                source_id=d.source_id,
+                question_type=d.question_type,
+                q_preview=_q_preview(d.original_q),
+                status=t.status,
+                edited=edited,
+                q_changed=q_changed,
+                change_ratio=ratio,
+                suspicious=is_suspicious,
+                tagged=is_tagged,
+                submitted_at=t.submitted_at,
+                last_accessed_at=t.last_accessed_at,
+            )
+        )
+    total = len(items)
+    suspicious_total = sum(1 for it in items if it.suspicious)
+    start = (page - 1) * page_size
+    return AdminTaskList(
+        items=items[start : start + page_size],
+        total=total,
+        page=page,
+        page_size=page_size,
+        ratio_histogram=histogram,
+        suspicious_total=suspicious_total,
+    )
+
+
+@router.get("/tasks/{task_id}/diff", response_model=AdminTaskDiff)
+async def admin_task_diff(
+    task_id: uuid.UUID,
+    admin: User = Depends(require_admin),  # noqa: ARG001
+    db: AsyncSession = Depends(get_db),
+):
+    """원본↔수정 대조 — spec §10 DiffViewer 데이터."""
+    row = (
+        await db.execute(
+            select(Task, Dataset, User.reviewer_code)
+            .join(Dataset, Dataset.id == Task.dataset_id)
+            .join(User, User.id == Task.user_id)
+            .where(Task.id == task_id)
+        )
+    ).one_or_none()
+    if row is None:
+        raise HTTPException(404, {"error_code": "NOT_FOUND"})
+    t, d, code = row
+
+    def side(original: str, modified: str | None) -> DiffSide:
+        if not modified:
+            return DiffSide(original=original)
+        s = diff_stats(original, modified)
+        return DiffSide(
+            original=original,
+            modified=modified,
+            changed_words=s["changed_words"],
+            change_ratio=s["change_ratio"],
+            identical=s["identical"],
+        )
+
+    answer_side = side(d.original_a, t.modified_a or t.draft_a)
+    return AdminTaskDiff(
+        task_id=t.id,
+        reviewer_code=code,
+        status=t.status,
+        question_type=d.question_type,
+        source_id=d.source_id,
+        question=side(d.original_q, t.modified_q or t.draft_q),
+        answer=answer_side,
+        suspicious=bool(not answer_side.identical and answer_side.modified and answer_side.change_ratio < settings.SUSPICIOUS_RATIO),
+        choices=d.choices,
+        rationale=d.rationale,
+        error_reasons=t.error_reasons,
+        error_note=t.error_note,
+        submitted_at=t.submitted_at,
+    )
 
 
 @router.post("/tasks/{task_id}/restore")
