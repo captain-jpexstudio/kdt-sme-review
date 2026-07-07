@@ -2,6 +2,7 @@
 import ast
 import json
 import os
+from datetime import datetime, timezone
 import tempfile
 import uuid
 from io import BytesIO
@@ -566,6 +567,43 @@ async def delete_batch(
     db.add(AuditLog(user_id=admin.id, action_type="BATCH_DELETE", details={"batch_id": batch_id, "datasets": deleted_datasets, "tasks": deleted_tasks}))
     await db.commit()
     return {"ok": True, "datasets": deleted_datasets, "tasks": deleted_tasks}
+
+
+@router.post("/users/{user_id}/complete-all")
+async def complete_all_tasks(
+    user_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """테스트용 일괄 완료 — 미완료 문항을 모두 completed 처리(수정본 없으면 원본 복사).
+    최종 제출→계좌 입력 등 후속 플로우 점검용. 복원은 reset-tasks."""
+    user = await db.get(User, user_id)
+    if user is None or user.role != "reviewer":
+        raise HTTPException(404, {"error_code": "NOT_FOUND"})
+    rows = (
+        await db.execute(
+            select(Task, Dataset)
+            .join(Dataset, Dataset.id == Task.dataset_id)
+            .where(Task.user_id == user_id, Task.status.notin_(["completed", "rejected"]))
+        )
+    ).all()
+    now = datetime.now(timezone.utc)
+    for t, d in rows:
+        t.status = "completed"
+        t.modified_q = t.modified_q or t.draft_q or d.original_q
+        t.modified_a = t.modified_a or t.draft_a or d.original_a
+        t.submitted_at = now
+        t.last_accessed_at = now
+        t.version += 1
+    db.add(
+        AuditLog(
+            user_id=admin.id,
+            action_type="TASK_BULK_COMPLETE",
+            details={"target_user_id": str(user_id), "reviewer_code": user.reviewer_code, "completed": len(rows)},
+        )
+    )
+    await db.commit()
+    return {"completed": len(rows)}
 
 
 @router.post("/users/{user_id}/reset-tasks", response_model=ResetTasksResponse)
