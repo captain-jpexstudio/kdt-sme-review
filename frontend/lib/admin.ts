@@ -59,6 +59,35 @@ export async function uploadDataset(
   return data;
 }
 
+export interface BatchInfo {
+  batch_id: string | null;
+  main: number;
+  reserved: number;
+  tasks: number;
+  started: boolean;
+}
+
+export async function getBatches(): Promise<BatchInfo[]> {
+  const { data } = await api.get<BatchInfo[]>("/admin/batches");
+  return data;
+}
+
+export async function deleteBatch(batchId: string): Promise<{ ok: boolean; datasets: number; tasks: number }> {
+  const { data } = await api.delete<{ ok: boolean; datasets: number; tasks: number }>(`/admin/batches/${encodeURIComponent(batchId)}`);
+  return data;
+}
+
+export interface ResetTasksResult {
+  reset: number;
+  replacements_removed: number;
+  unlocked: boolean;
+}
+
+export async function resetReviewerTasks(userId: string): Promise<ResetTasksResult> {
+  const { data } = await api.post<ResetTasksResult>(`/admin/users/${userId}/reset-tasks`);
+  return data;
+}
+
 export interface SignatureInfo {
   id: number;
   kind: string; // agreement | batch

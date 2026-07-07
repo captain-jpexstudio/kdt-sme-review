@@ -1,6 +1,6 @@
 "use client";
 
-import { FileCheck, FileText, LockOpen, PenLine, Radio, RefreshCw } from "lucide-react";
+import { FileCheck, FileText, LockOpen, PenLine, Radio, RefreshCw, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -8,6 +8,7 @@ import {
   finalPdfUrl,
   getReviewers,
   getReviewerSignatures,
+  resetReviewerTasks,
   signatureImageUrl,
   unlockReviewer,
   type ReviewerProgress,
@@ -58,6 +59,32 @@ export default function ReviewersPage() {
       await refresh();
     } catch {
       setError("잠금 해제에 실패했습니다.");
+    }
+  };
+
+  // 작업 리셋 — 파괴적 작업이라 검수자 코드를 직접 입력해야 실행
+  const reset = async (r: ReviewerProgress) => {
+    const code = r.reviewer_code ?? r.username;
+    const typed = window.prompt(
+      `${code}의 검수 작업을 전부 초기화합니다.\n\n` +
+        "- 모든 문항이 최초 배정 상태(대기·무편집)로 돌아갑니다\n" +
+        "- 임시저장·제출본·오류 태깅이 삭제됩니다 (복구 불가)\n" +
+        "- 폐기 대체로 받은 예비 문항은 회수되고, 최종 제출 잠금도 해제됩니다\n" +
+        "- 서명·동의 증빙과 감사 로그는 보존됩니다\n\n" +
+        `진행하려면 검수자 코드(${code})를 그대로 입력하세요:`,
+    );
+    if (typed === null) return;
+    if (typed.trim() !== code) {
+      window.alert("입력한 코드가 일치하지 않아 취소했습니다.");
+      return;
+    }
+    setError(null);
+    try {
+      const res = await resetReviewerTasks(r.user_id);
+      await refresh();
+      window.alert(`리셋 완료 · 문항 ${res.reset}건 초기화, 예비 회수 ${res.replacements_removed}건${res.unlocked ? ", 잠금 해제됨" : ""}`);
+    } catch {
+      setError("작업 리셋에 실패했습니다.");
     }
   };
 
@@ -139,6 +166,9 @@ export default function ReviewersPage() {
                 <button onClick={() => unlock(cur.user_id)} disabled={!cur.locked} style={cur.locked ? S.unlockButton : S.disabledButton}>
                   <LockOpen size={15} /> 잠금 해제
                 </button>
+                <button onClick={() => reset(cur)} title="모든 문항을 최초 배정 상태로 초기화(복구 불가)" style={resetButton}>
+                  <RotateCcw size={14} /> 작업 리셋
+                </button>
               </div>
 
               <TasksPanel userId={cur.user_id} />
@@ -194,5 +224,6 @@ const statValue: React.CSSProperties = { fontSize: 22, fontWeight: 700, letterSp
 const actionRow: React.CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", margin: "16px 0", paddingTop: 16, borderTop: `1px solid ${c.line}` };
 const sigWrap: React.CSSProperties = { paddingTop: 4 };
 const sigTitle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 700, color: c.ink, marginBottom: 10 };
+const resetButton: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, border: `1px solid ${c.dangerBorder}`, background: "#fff", color: c.danger, borderRadius: radius.control, padding: "7px 13px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginLeft: "auto" };
 const livePill: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: c.brandText, background: c.brandTint, border: `1px solid ${c.brandBorder}`, borderRadius: 999, padding: "2px 9px" };
 const lockPill: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: c.warnText, background: c.warnBg, border: `1px solid ${c.warnBorder}`, borderRadius: 999, padding: "2px 9px" };
