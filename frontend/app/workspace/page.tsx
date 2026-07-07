@@ -403,6 +403,8 @@ export default function WorkspacePage() {
             <div>
               <b>최종 제출이 완료되어 읽기전용으로 잠겼습니다.</b>
               <div>관리자 해제 전까지 저장과 제출은 차단됩니다.</div>
+              {/* '나중에 입력'으로 계좌 모달을 닫았어도 재입력 가능해야 함 */}
+              <button onClick={() => setPaymentOpen(true)} style={paymentReopen}>자문료 지급 계좌 입력/수정</button>
             </div>
           </div>
         )}
@@ -682,6 +684,7 @@ const workspace: React.CSSProperties = { padding: 28, minWidth: 0, height: "100v
 const backButton: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 12px", marginBottom: 12, border: `1px solid ${c.line2}`, borderRadius: radius.control, background: "#fff", color: c.ink, fontSize: 13, fontWeight: 500, cursor: "pointer" };
 const errorBox: React.CSSProperties = { border: `1px solid ${c.dangerBorder}`, background: c.dangerBg, color: c.danger, borderRadius: radius.control, padding: "11px 13px", marginBottom: 12, fontSize: 13 };
 const lockedBanner: React.CSSProperties = { display: "flex", alignItems: "flex-start", gap: 11, border: `1px solid ${c.warnBorder}`, background: c.warnBg, color: c.warnText, borderRadius: radius.control, padding: "12px 14px", marginBottom: 14, fontSize: 13 };
+const paymentReopen: React.CSSProperties = { marginTop: 8, border: `1px solid ${c.warnBorder}`, background: "#fff", color: c.warnText, borderRadius: radius.control, padding: "6px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" };
 const emptyDetail: React.CSSProperties = { height: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: c.sub };
 const detailHead: React.CSSProperties = { marginBottom: 16 };
 const detailTitle: React.CSSProperties = { fontSize: 21, lineHeight: 1.45, margin: "3px 0 0", fontWeight: 700, letterSpacing: "-0.4px" };
