@@ -92,6 +92,24 @@ class AdminTaskDiff(BaseModel):
     submitted_at: datetime | None = None
 
 
+class AuditLogItem(BaseModel):
+    id: int
+    action_type: str
+    username: str | None = None
+    reviewer_code: str | None = None
+    role: str | None = None
+    details: dict | None = None
+    client_ip: str | None = None
+    created_at: datetime
+
+
+class AuditLogList(BaseModel):
+    items: list[AuditLogItem]
+    total: int
+    page: int
+    page_size: int
+
+
 class BatchInfo(BaseModel):
     batch_id: str | None
     main: int

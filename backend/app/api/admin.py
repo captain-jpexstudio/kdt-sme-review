@@ -22,6 +22,8 @@ from app.schemas.admin import (
     AdminTaskDiff,
     AdminTaskItem,
     AdminTaskList,
+    AuditLogItem,
+    AuditLogList,
     BatchInfo,
     DiffSide,
     RejectedItem,
@@ -264,6 +266,56 @@ async def stats(admin: User = Depends(require_admin), db: AsyncSession = Depends
         rejected=counts["rejected"],
         locked_reviewers=locked,
         progress_pct=(counts["completed"] / total * 100) if total else 0,
+    )
+
+
+@router.get("/audit", response_model=AuditLogList)
+async def audit_logs(
+    action_type: str | None = None,
+    user_id: uuid.UUID | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    admin: User = Depends(require_admin),  # noqa: ARG001
+    db: AsyncSession = Depends(get_db),
+):
+    """감사 로그 조회 — append-only audit_logs 열람(최신순). 로그·화면 모두 가명(D5)."""
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 200)
+    cond = []
+    if action_type:
+        cond.append(AuditLog.action_type == action_type)
+    if user_id:
+        cond.append(AuditLog.user_id == user_id)
+    total = (
+        await db.execute(select(func.count()).select_from(AuditLog).where(*cond))
+    ).scalar_one()
+    rows = (
+        await db.execute(
+            select(AuditLog, User.username, User.reviewer_code, User.role)
+            .outerjoin(User, User.id == AuditLog.user_id)
+            .where(*cond)
+            .order_by(AuditLog.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    ).all()
+    return AuditLogList(
+        items=[
+            AuditLogItem(
+                id=log.id,
+                action_type=log.action_type,
+                username=username,
+                reviewer_code=reviewer_code,
+                role=role,
+                details=log.details,
+                client_ip=log.client_ip,
+                created_at=log.created_at,
+            )
+            for log, username, reviewer_code, role in rows
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
     )
 
 
