@@ -332,7 +332,7 @@ async def audit_stream(admin: User = Depends(require_admin)):  # noqa: ARG001
 async def export(
     batch_id: str | None = None,
     locked_only: bool = False,
-    admin: User = Depends(require_admin),  # noqa: ARG001
+    admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = (
@@ -383,6 +383,14 @@ async def export(
         }
         for r in rows
     ]
+    db.add(
+        AuditLog(
+            user_id=admin.id,
+            action_type="EXPORT",
+            details={"batch_id": batch_id, "locked_only": locked_only, "rows": len(data)},
+        )
+    )
+    await db.commit()
     buf = BytesIO()
     pd.DataFrame(data).to_excel(buf, index=False)
     buf.seek(0)
