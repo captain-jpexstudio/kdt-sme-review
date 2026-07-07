@@ -213,8 +213,12 @@ function apiBase(): string {
   return process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost/api/v1";
 }
 
-export function exportUrl(batchId?: string): string {
-  return `${apiBase()}/admin/export${batchId ? `?batch_id=${encodeURIComponent(batchId)}` : ""}`;
+export function exportUrl(batchId?: string, lockedOnly?: boolean): string {
+  const params = new URLSearchParams();
+  if (batchId) params.set("batch_id", batchId);
+  if (lockedOnly) params.set("locked_only", "true");
+  const qs = params.toString();
+  return `${apiBase()}/admin/export${qs ? `?${qs}` : ""}`;
 }
 
 export function agreementPdfUrl(userId: string): string {

@@ -12,6 +12,7 @@ export default function AdminDashboardPage() {
   const ready = useAdminGuard();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [batchId, setBatchId] = useState("");
+  const [lockedOnly, setLockedOnly] = useState(false);
 
   const refresh = useCallback(async () => {
     setStats(await getAdminStats());
@@ -30,8 +31,12 @@ export default function AdminDashboardPage() {
       right={
         <>
           <input value={batchId} onChange={(e) => setBatchId(e.target.value)} placeholder="batch_id (선택)" style={S.batchInput} />
-          <a href={exportUrl(batchId.trim() || undefined)} style={S.primaryButton}>
-            <Download size={16} /> Export{batchId.trim() ? ` (${batchId.trim()})` : ""}
+          <label style={lockedOnlyLabel} title="최종 서명 제출(잠금)까지 마친 검수자의 문항만 내보냅니다">
+            <input type="checkbox" checked={lockedOnly} onChange={(e) => setLockedOnly(e.target.checked)} />
+            최종 제출자만
+          </label>
+          <a href={exportUrl(batchId.trim() || undefined, lockedOnly)} style={S.primaryButton}>
+            <Download size={16} /> Export{batchId.trim() ? ` (${batchId.trim()})` : ""}{lockedOnly ? " · 최종" : ""}
           </a>
           <button onClick={() => refresh()} style={S.secondaryButton}><RefreshCw size={16} /> 새로고침</button>
         </>
@@ -66,6 +71,7 @@ export default function AdminDashboardPage() {
   );
 }
 
+const lockedOnlyLabel: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: c.ink, cursor: "pointer", whiteSpace: "nowrap" };
 const quickGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 16 };
 const quickCard: React.CSSProperties = { display: "flex", alignItems: "center", gap: 14, border: `1px solid ${c.line}`, borderRadius: radius.card, background: "#fff", padding: "18px 20px", textDecoration: "none", color: c.ink, boxShadow: shadow.card };
 const quickIcon: React.CSSProperties = { width: 42, height: 42, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: radius.control, background: c.brandTint, color: c.brandText };

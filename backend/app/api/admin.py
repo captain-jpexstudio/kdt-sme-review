@@ -277,6 +277,7 @@ async def audit_stream(admin: User = Depends(require_admin)):  # noqa: ARG001
 @router.get("/export")
 async def export(
     batch_id: str | None = None,
+    locked_only: bool = False,
     admin: User = Depends(require_admin),  # noqa: ARG001
     db: AsyncSession = Depends(get_db),
 ):
@@ -305,6 +306,8 @@ async def export(
     )
     if batch_id:
         stmt = stmt.where(Dataset.batch_id == batch_id)
+    if locked_only:
+        stmt = stmt.where(User.is_batch_submitted.is_(True))  # 최종 서명 제출(잠금)한 검수자 분만
     rows = (await db.execute(stmt)).all()
     data = [
         {
@@ -329,7 +332,7 @@ async def export(
     buf = BytesIO()
     pd.DataFrame(data).to_excel(buf, index=False)
     buf.seek(0)
-    suffix = batch_id or "all"
+    suffix = (batch_id or "all") + ("-final" if locked_only else "")
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
