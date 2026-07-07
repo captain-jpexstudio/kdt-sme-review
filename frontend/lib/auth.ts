@@ -4,6 +4,7 @@ export interface AuthState {
   role: "admin" | "reviewer";
   is_agreed: boolean;
   is_batch_submitted: boolean;
+  username: string;
 }
 
 export async function login(username: string, password: string): Promise<AuthState> {

@@ -72,6 +72,7 @@ export default function WorkspacePage() {
   const [finalSig, setFinalSig] = useState<SignatureValue | null>(null);
   const [finalBusy, setFinalBusy] = useState(false);
   const [briefing, setBriefing] = useState(false);
+  const briefingKey = useRef("sme_briefing_v1");
   const [paymentOpen, setPaymentOpen] = useState(false);
   const qRef = useRef(qDraft);
   const aRef = useRef(aDraft);
@@ -144,6 +145,9 @@ export default function WorkspacePage() {
         }
         setLocked(me.is_batch_submitted);
         setReady(true);
+        // 브리핑 최초 1회 자동 표시 — 사용자별 키(같은 브라우저의 다른 계정에서도 떠야 함)
+        briefingKey.current = `sme_briefing_v1:${me.username}`;
+        if (!window.localStorage.getItem(briefingKey.current)) setBriefing(true);
         const [sum, list, resumed, nextEligibility] = await Promise.all([
           getTaskSummary(),
           listTasks({ sort }),
@@ -306,11 +310,6 @@ export default function WorkspacePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [saveDraft, submitCurrent]);
 
-  // 검수 착수 전 브리핑 — 최초 1회 자동 표시(#4).
-  useEffect(() => {
-    if (typeof window !== "undefined" && !window.localStorage.getItem("sme_briefing_v1")) setBriefing(true);
-  }, []);
-
   const toggleReason = (reason: ErrorReasonName) => {
     if (locked) return;
     setReasons((prev) => {
@@ -328,7 +327,7 @@ export default function WorkspacePage() {
 
   return (
     <Shell role="reviewer" bare>
-      {briefing && <Briefing onDone={() => { window.localStorage.setItem("sme_briefing_v1", "1"); setBriefing(false); }} />}
+      {briefing && <Briefing onDone={() => { window.localStorage.setItem(briefingKey.current, "1"); setBriefing(false); }} />}
       {paymentOpen && <PaymentForm onDone={() => setPaymentOpen(false)} />}
       <main style={page} className="ws-page" data-view={mobileView}>
       <aside style={sidebar} className="ws-sidebar">
