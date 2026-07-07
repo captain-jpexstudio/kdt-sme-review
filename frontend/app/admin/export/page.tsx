@@ -3,7 +3,7 @@
 import { Download, FileSpreadsheet } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { exportUrl, getAuditLogs, getBatches, type AuditLogItem, type BatchInfo } from "@/lib/admin";
+import { exportUrl, getAuditLogs, getBatches, getExportPreview, type AuditLogItem, type BatchInfo } from "@/lib/admin";
 import { Shell } from "@/components/Shell";
 import { c, radius } from "@/lib/theme";
 import { S, useAdminGuard } from "../ui";
@@ -25,6 +25,7 @@ export default function AdminExportPage() {
   const [batchId, setBatchId] = useState("");
   const [lockedOnly, setLockedOnly] = useState(true);
   const [history, setHistory] = useState<AuditLogItem[]>([]);
+  const [previewRows, setPreviewRows] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     const [b, h] = await Promise.all([
@@ -38,6 +39,15 @@ export default function AdminExportPage() {
   useEffect(() => {
     if (ready) refresh();
   }, [ready, refresh]);
+
+  // 조건 변경 시 예상 행수 갱신 — 빈 파일 다운로드 방지
+  useEffect(() => {
+    if (!ready) return;
+    setPreviewRows(null);
+    getExportPreview(batchId || undefined, lockedOnly)
+      .then(setPreviewRows)
+      .catch(() => setPreviewRows(null));
+  }, [ready, batchId, lockedOnly]);
 
   if (!ready) return <main style={S.loading}>확인 중…</main>;
 
@@ -67,10 +77,19 @@ export default function AdminExportPage() {
               <b>최종 제출자만</b> <span style={hint}>— 반출용 확정본. 해제하면 진행 중 검수자의 완료분도 포함(중간 점검용)</span>
             </span>
           </label>
-          <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <a href={exportUrl(batchId || undefined, lockedOnly)} style={S.primaryButton} onClick={() => setTimeout(refresh, 1500)}>
               <Download size={16} /> 다운로드{lockedOnly ? " (최종본)" : " (전체 완료분)"}
             </a>
+            {previewRows !== null && (
+              <span style={previewRows === 0 ? previewWarn : previewOk}>
+                {previewRows === 0
+                  ? lockedOnly
+                    ? "예상 0행 — 아직 최종 제출한 검수자가 없습니다. 체크를 해제하면 제출 완료분이 포함됩니다."
+                    : "예상 0행 — 제출 완료된 문항이 없습니다."
+                  : `예상 ${previewRows.toLocaleString()}행`}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -115,6 +134,8 @@ const label: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: c.ink
 const hint: React.CSSProperties = { fontSize: 12.5, fontWeight: 400, color: c.sub };
 const select: React.CSSProperties = { height: 38, border: `1px solid ${c.line2}`, borderRadius: radius.control, padding: "0 10px", fontSize: 13.5, background: "#fff", color: c.ink };
 const checkRow: React.CSSProperties = { display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13.5, color: c.ink, cursor: "pointer", lineHeight: 1.5 };
+const previewOk: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: c.brandText };
+const previewWarn: React.CSSProperties = { fontSize: 12.5, fontWeight: 500, color: c.warnText, background: c.warnBg, border: `1px solid ${c.warnBorder}`, borderRadius: radius.control, padding: "6px 11px", lineHeight: 1.5 };
 const colList: React.CSSProperties = { margin: 0, display: "flex", flexDirection: "column", gap: 0 };
 const colRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "minmax(200px, 380px) 1fr", gap: 14, padding: "9px 0", borderTop: `1px solid ${c.line}`, fontSize: 13 };
 const colKey: React.CSSProperties = { fontFamily: "monospace", color: c.ink, fontSize: 12.5 };

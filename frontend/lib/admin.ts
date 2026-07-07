@@ -269,6 +269,14 @@ function apiBase(): string {
   return process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost/api/v1";
 }
 
+export async function getExportPreview(batchId?: string, lockedOnly?: boolean): Promise<number> {
+  const params: Record<string, string | boolean> = {};
+  if (batchId) params.batch_id = batchId;
+  if (lockedOnly) params.locked_only = true;
+  const { data } = await api.get<{ rows: number }>("/admin/export/preview", { params });
+  return data.rows;
+}
+
 export function exportUrl(batchId?: string, lockedOnly?: boolean): string {
   const params = new URLSearchParams();
   if (batchId) params.set("batch_id", batchId);

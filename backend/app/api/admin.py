@@ -328,6 +328,28 @@ async def audit_stream(admin: User = Depends(require_admin)):  # noqa: ARG001
     return EventSourceResponse(events())
 
 
+@router.get("/export/preview")
+async def export_preview(
+    batch_id: str | None = None,
+    locked_only: bool = False,
+    admin: User = Depends(require_admin),  # noqa: ARG001
+    db: AsyncSession = Depends(get_db),
+):
+    """Export 예상 행수 — 다운로드 전 조건 확인용."""
+    stmt = (
+        select(func.count())
+        .select_from(Task)
+        .join(User, User.id == Task.user_id)
+        .join(Dataset, Dataset.id == Task.dataset_id)
+        .where(Task.status == "completed")
+    )
+    if batch_id:
+        stmt = stmt.where(Dataset.batch_id == batch_id)
+    if locked_only:
+        stmt = stmt.where(User.is_batch_submitted.is_(True))
+    return {"rows": (await db.execute(stmt)).scalar_one()}
+
+
 @router.get("/export")
 async def export(
     batch_id: str | None = None,
