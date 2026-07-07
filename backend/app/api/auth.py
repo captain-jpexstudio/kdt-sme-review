@@ -29,7 +29,7 @@ def _set_auth_cookies(resp: Response, user: User) -> None:
 
 
 def _state(user: User) -> AuthState:
-    return AuthState(role=user.role, is_agreed=user.is_agreed, is_batch_submitted=user.is_batch_submitted)
+    return AuthState(role=user.role, is_agreed=user.is_agreed, is_batch_submitted=user.is_batch_submitted, username=user.username)
 
 
 @router.post("/login", response_model=AuthState)

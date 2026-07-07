@@ -11,6 +11,7 @@ class AuthState(BaseModel):
     role: str
     is_agreed: bool
     is_batch_submitted: bool
+    username: str  # 클라이언트 사용자별 상태 키(브리핑 최초표시 등)
 
 
 class AgreementRequest(BaseModel):
