@@ -82,6 +82,39 @@ export interface RejectedItem {
   rejected_at: string | null;
 }
 
+export interface ReservedBatch {
+  batch_id: string | null;
+  total: number;
+  assigned: number;
+  remaining: number;
+}
+
+export interface ReservedItem {
+  dataset_id: number;
+  source_id: string | null;
+  batch_id: string | null;
+  question_type: string | null;
+  q_preview: string;
+  assigned_to: string | null;
+}
+
+export interface ReservedOverview {
+  batches: ReservedBatch[];
+  items: ReservedItem[];
+}
+
+export async function getReserved(batchId?: string): Promise<ReservedOverview> {
+  const { data } = await api.get<ReservedOverview>("/admin/reserved", { params: batchId ? { batch_id: batchId } : {} });
+  return data;
+}
+
+export async function uploadReserved(batchId: string, file: File): Promise<{ batch_id: string; added: number; remaining: number }> {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await api.post<{ batch_id: string; added: number; remaining: number }>("/admin/reserved/upload", form, { params: { batch_id: batchId } });
+  return data;
+}
+
 export async function getRejected(batchId?: string): Promise<RejectedItem[]> {
   const { data } = await api.get<RejectedItem[]>("/admin/rejected", { params: batchId ? { batch_id: batchId } : {} });
   return data;
