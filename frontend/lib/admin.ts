@@ -2,10 +2,11 @@ import { api } from "./api";
 
 export interface AdminStats {
   reviewers: number;
-  total_tasks: number;
+  total_tasks: number; // 현재 작업분(폐기 제외)
   completed: number;
   in_progress: number;
   pending: number;
+  rejected: number;
   locked_reviewers: number;
   progress_pct: number;
 }
@@ -14,10 +15,11 @@ export interface ReviewerProgress {
   user_id: string;
   username: string;
   reviewer_code: string | null;
-  total: number;
+  total: number; // 현재 작업분(폐기 제외)
   completed: number;
   in_progress: number;
   pending: number;
+  rejected: number;
   progress_pct: number;
   locked: boolean;
   batch_submitted_at: string | null;

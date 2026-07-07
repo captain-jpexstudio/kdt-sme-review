@@ -186,10 +186,11 @@ async def _reviewer_progress_rows(db: AsyncSession) -> list[ReviewerProgress]:
                 .group_by(Task.status)
             )
         ).all()
-        counts = {"pending": 0, "in_progress": 0, "completed": 0}
+        counts = {"pending": 0, "in_progress": 0, "completed": 0, "rejected": 0}
         for status, count in rows:
             counts[status] = count
-        total = sum(counts.values())
+        # 폐기분은 예비 문항으로 대체 배정되므로 작업량(전체)에서 제외, 별도 표기.
+        total = counts["pending"] + counts["in_progress"] + counts["completed"]
         last_activity = (
             await db.execute(select(func.max(Task.last_accessed_at)).where(Task.user_id == user.id))
         ).scalar_one_or_none()
@@ -218,6 +219,7 @@ async def _reviewer_progress_rows(db: AsyncSession) -> list[ReviewerProgress]:
                 completed=counts["completed"],
                 in_progress=counts["in_progress"],
                 pending=counts["pending"],
+                rejected=counts["rejected"],
                 progress_pct=(counts["completed"] / total * 100) if total else 0,
                 locked=user.is_batch_submitted,
                 batch_submitted_at=user.batch_submitted_at,
@@ -237,10 +239,10 @@ async def reviewers(admin: User = Depends(require_admin), db: AsyncSession = Dep
 @router.get("/stats", response_model=AdminStats)
 async def stats(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):  # noqa: ARG001
     rows = (await db.execute(select(Task.status, func.count()).group_by(Task.status))).all()
-    counts = {"pending": 0, "in_progress": 0, "completed": 0}
+    counts = {"pending": 0, "in_progress": 0, "completed": 0, "rejected": 0}
     for status, count in rows:
         counts[status] = count
-    total = sum(counts.values())
+    total = counts["pending"] + counts["in_progress"] + counts["completed"]
     reviewers_count = (await db.execute(select(func.count()).select_from(User).where(User.role == "reviewer"))).scalar_one()
     locked = (
         await db.execute(
@@ -253,6 +255,7 @@ async def stats(admin: User = Depends(require_admin), db: AsyncSession = Depends
         completed=counts["completed"],
         in_progress=counts["in_progress"],
         pending=counts["pending"],
+        rejected=counts["rejected"],
         locked_reviewers=locked,
         progress_pct=(counts["completed"] / total * 100) if total else 0,
     )
@@ -485,6 +488,8 @@ async def admin_tasks(
         stmt = stmt.where(Task.user_id == user_id)
     if status:
         stmt = stmt.where(Task.status == status)
+    else:
+        stmt = stmt.where(Task.status != "rejected")  # '전체'=현재 작업분. 폐기는 status=rejected로 조회.
     if batch_id:
         stmt = stmt.where(Dataset.batch_id == batch_id)
     if q:

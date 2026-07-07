@@ -121,6 +121,7 @@ export default function ReviewersPage() {
                 <span>진행률 <b>{Math.round(cur.progress_pct)}%</b></span>
                 <span>평균 변경률 <b>{cur.avg_change_ratio == null ? "-" : `${Math.round(cur.avg_change_ratio * 100)}%`}</b></span>
                 <span>의심(변경량 낮음) <b>{cur.trivial_count}</b></span>
+                {cur.rejected > 0 && <span>폐기(예비로 대체됨) <b>{cur.rejected}</b></span>}
                 <span>최근 활동 {cur.last_activity_at ? new Date(cur.last_activity_at).toLocaleString("ko-KR") : "-"}</span>
               </div>
 

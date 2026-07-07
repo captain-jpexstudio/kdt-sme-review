@@ -40,7 +40,7 @@ export default function AdminDashboardPage() {
       <section style={S.summaryGrid}>
         <Metric label="완료율" value={`${Math.round(stats.progress_pct)}%`} foot={`전체 ${stats.completed}/${stats.total_tasks}`} accent />
         <Metric label="검수자" value={`${stats.reviewers}`} foot="배정 인원" />
-        <Metric label="작업중" value={`${stats.in_progress}`} foot="진행 중 문항" />
+        <Metric label="작업중" value={`${stats.in_progress}`} foot={stats.rejected > 0 ? `진행 중 문항 · 폐기 ${stats.rejected}건 별도` : "진행 중 문항"} />
         <Metric label="잠금" value={`${stats.locked_reviewers}`} foot="최종 제출 잠금" />
       </section>
 

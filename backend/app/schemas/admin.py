@@ -8,10 +8,11 @@ class ReviewerProgress(BaseModel):
     user_id: uuid.UUID
     username: str
     reviewer_code: str | None
-    total: int
+    total: int  # 현재 작업분(폐기 제외 = 대체 배정 후 300 유지)
     completed: int
     in_progress: int
     pending: int
+    rejected: int = 0
     progress_pct: float
     locked: bool
     batch_submitted_at: datetime | None = None
@@ -22,10 +23,11 @@ class ReviewerProgress(BaseModel):
 
 class AdminStats(BaseModel):
     reviewers: int
-    total_tasks: int
+    total_tasks: int  # 현재 작업분(폐기 제외)
     completed: int
     in_progress: int
     pending: int
+    rejected: int = 0
     locked_reviewers: int
     progress_pct: float
 
