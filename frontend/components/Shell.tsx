@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Ban, BookOpen, ClipboardCheck, Download, History, LayoutDashboard, LogOut, Menu, Settings, Upload, Users, X } from "lucide-react";
+import { Activity, Ban, BookOpen, ClipboardCheck, Download, History, LayoutDashboard, LogOut, Menu, Upload, Users, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
@@ -22,8 +22,7 @@ const NAV: Record<"reviewer" | "admin", Item[]> = {
     { key: "tasks", label: "문항 목록", href: "/admin/tasks", icon: ClipboardCheck },
     { key: "rejected", label: "폐기·예비 문항", href: "/admin/rejected", icon: Ban },
     { key: "events", label: "감사 로그 (실시간)", href: "/admin/events", icon: Activity },
-    { key: "export", label: "내보내기", icon: Download, soon: true },
-    { key: "settings", label: "설정", icon: Settings, soon: true },
+    { key: "export", label: "내보내기", href: "/admin/export", icon: Download },
   ],
 };
 
