@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Ban, BookOpen, ClipboardCheck, Download, HelpCircle, History, LayoutDashboard, LogOut, Menu, Settings, Upload, Users, X } from "lucide-react";
+import { Activity, Ban, BookOpen, ClipboardCheck, Download, History, LayoutDashboard, LogOut, Menu, Settings, Upload, Users, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
@@ -13,7 +13,7 @@ const NAV: Record<"reviewer" | "admin", Item[]> = {
   reviewer: [
     { key: "workspace", label: "검수 워크스페이스", href: "/workspace", icon: ClipboardCheck },
     { key: "history", label: "내 검수 이력", href: "/history", icon: History },
-    { key: "guide", label: "검수 가이드", icon: BookOpen, soon: true },
+    { key: "guide", label: "검수 가이드", href: "/guide", icon: BookOpen },
   ],
   admin: [
     { key: "dashboard", label: "대시보드", href: "/admin", icon: LayoutDashboard },
@@ -92,9 +92,6 @@ export function Shell({
         })}
       </nav>
       <div style={railFoot}>
-        <button style={navItem} onClick={() => {}}>
-          <span style={navLabel}><HelpCircle size={17} /> 도움말</span>
-        </button>
         <button style={navItem} onClick={logout}>
           <span style={navLabel}><LogOut size={17} /> 로그아웃</span>
         </button>
