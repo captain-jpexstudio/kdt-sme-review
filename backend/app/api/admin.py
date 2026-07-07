@@ -274,7 +274,23 @@ async def export(
     db: AsyncSession = Depends(get_db),
 ):
     stmt = (
-        select(User.reviewer_code, Dataset.batch_id, Dataset.id, Dataset.original_q, Dataset.original_a, Task.modified_q, Task.modified_a, Task.error_reasons, Task.error_note, Task.submitted_at)
+        select(
+            User.reviewer_code,
+            Dataset.batch_id,
+            Dataset.id,
+            Dataset.original_q,
+            Dataset.original_a,
+            Task.modified_q,
+            Task.modified_a,
+            Task.error_reasons,
+            Task.error_note,
+            Task.submitted_at,
+            Dataset.capability_category,
+            Dataset.joint_domain,
+            Dataset.difficulty,
+            Dataset.question_type,
+            Dataset.rationale,
+        )
         .join(Task, Task.user_id == User.id)
         .join(Dataset, Dataset.id == Task.dataset_id)
         .where(Task.status == "completed")
@@ -288,10 +304,15 @@ async def export(
             "reviewer_code": r[0],
             "batch_id": r[1],
             "dataset_id": r[2],
+            "capability_category": r[10],
+            "joint_domain": r[11],
+            "difficulty": r[12],
+            "question_type": r[13],
             "original_q": r[3],
             "original_a": r[4],
             "modified_q": r[5],
             "modified_a": r[6],
+            "rationale_cot": r[14],
             "error_reasons": json.dumps(r[7] or [], ensure_ascii=False),
             "error_note": r[8],
             "submitted_at": r[9].isoformat() if r[9] else None,
