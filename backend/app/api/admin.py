@@ -24,6 +24,10 @@ from app.schemas.admin import (
     AdminTaskList,
     DiffSide,
     RejectedItem,
+    ReservedBatch,
+    ReservedItem,
+    ReservedOverview,
+    ReservedUploadResponse,
     ReviewerProgress,
     SignatureInfo,
 )
@@ -418,6 +422,118 @@ async def final_pdf(
 def _q_preview(text: str, limit: int = 80) -> str:
     s = " ".join((text or "").split())
     return s if len(s) <= limit else s[: limit - 1] + "…"
+
+
+@router.get("/reserved", response_model=ReservedOverview)
+async def reserved_overview(
+    batch_id: str | None = None,
+    admin: User = Depends(require_admin),  # noqa: ARG001
+    db: AsyncSession = Depends(get_db),
+):
+    """예비(reserved) 풀 현황 — 폐기 시 자동 대체 배정에 쓰이는 재고. 배치별 잔여 + 문항별 배정 상태."""
+    stmt = (
+        select(Dataset, User.reviewer_code)
+        .outerjoin(Task, Task.dataset_id == Dataset.id)
+        .outerjoin(User, User.id == Task.user_id)
+        .where(Dataset.status == "reserved")
+        .order_by(Dataset.batch_id, Dataset.id)
+    )
+    if batch_id:
+        stmt = stmt.where(Dataset.batch_id == batch_id)
+    rows = (await db.execute(stmt)).all()
+
+    items = [
+        ReservedItem(
+            dataset_id=d.id,
+            source_id=d.source_id,
+            batch_id=d.batch_id,
+            question_type=d.question_type,
+            q_preview=_q_preview(d.original_q),
+            assigned_to=code,
+        )
+        for d, code in rows
+    ]
+    # 배치 목록은 전체 데이터셋 기준 — 예비 0인 배치도 카드로 노출해 보충 가능하게.
+    all_batches = (
+        await db.execute(select(Dataset.batch_id).distinct().order_by(Dataset.batch_id))
+    ).scalars().all()
+    per_batch: dict[str | None, dict[str, int]] = {bid: {"total": 0, "assigned": 0} for bid in all_batches}
+    for it in items:
+        b = per_batch.setdefault(it.batch_id, {"total": 0, "assigned": 0})
+        b["total"] += 1
+        if it.assigned_to:
+            b["assigned"] += 1
+    batches = [
+        ReservedBatch(batch_id=bid, total=v["total"], assigned=v["assigned"], remaining=v["total"] - v["assigned"])
+        for bid, v in per_batch.items()
+    ]
+    return ReservedOverview(batches=batches, items=items)
+
+
+@router.post("/reserved/upload", response_model=ReservedUploadResponse)
+async def upload_reserved(
+    batch_id: str,
+    file: UploadFile = File(...),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """예비 풀 보충 — 기존 배치에 reserved 문항 추가(xlsx, question/answer 필수)."""
+    if not file.filename or not file.filename.lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(400, {"error_code": "INVALID_FILE", "message": "xlsx 파일만 업로드할 수 있습니다."})
+    exists = (
+        await db.execute(select(Dataset.id).where(Dataset.batch_id == batch_id).limit(1))
+    ).scalar_one_or_none()
+    if exists is None:
+        raise HTTPException(404, {"error_code": "BATCH_NOT_FOUND", "message": "존재하지 않는 batch_id입니다."})
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
+        try:
+            df = load_xlsx(tmp_path)
+        except ValueError as e:
+            raise HTTPException(400, {"error_code": "INVALID_DATASET", "message": str(e)})
+        for _, row in df.iterrows():
+            db.add(
+                Dataset(
+                    source_id=_cell(df, row, "id"),
+                    original_q=str(row["question"]).strip(),
+                    original_a=str(row["answer"]).strip(),
+                    rationale=_join_list(row.get("rationale")) if "rationale" in df.columns else None,
+                    choices=_parse_list(row.get("choices")) if "choices" in df.columns else None,
+                    supporting_doctrine=_parse_list(row.get("supporting_doctrine")) if "supporting_doctrine" in df.columns else None,
+                    capability_category=_cell(df, row, "capability_category"),
+                    joint_domain=_cell(df, row, "joint_domain"),
+                    solver=_cell(df, row, "solver"),
+                    difficulty=_cell(df, row, "difficulty"),
+                    question_type=_cell(df, row, "question_type"),
+                    status="reserved",
+                    assigned_persona=_cell(df, row, "assigned_persona"),
+                    batch_id=batch_id,
+                )
+            )
+        db.add(
+            AuditLog(
+                user_id=admin.id,
+                action_type="RESERVED_UPLOAD",
+                details={"batch_id": batch_id, "added": len(df), "filename": file.filename},
+            )
+        )
+        await db.commit()
+        unassigned = ~select(Task.id).where(Task.dataset_id == Dataset.id).exists()
+        remaining = (
+            await db.execute(
+                select(func.count()).select_from(Dataset).where(
+                    Dataset.status == "reserved", Dataset.batch_id == batch_id, unassigned
+                )
+            )
+        ).scalar_one()
+        return ReservedUploadResponse(batch_id=batch_id, added=len(df), remaining=remaining)
+    finally:
+        if tmp_path:
+            os.unlink(tmp_path)
 
 
 @router.get("/rejected", response_model=list[RejectedItem])

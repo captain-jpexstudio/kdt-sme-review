@@ -92,6 +92,33 @@ class AdminTaskDiff(BaseModel):
     submitted_at: datetime | None = None
 
 
+class ReservedBatch(BaseModel):
+    batch_id: str | None
+    total: int      # 업로드된 예비 전체
+    assigned: int   # 폐기 대체로 이미 배정됨
+    remaining: int  # 잔여(다음 폐기 시 사용)
+
+
+class ReservedItem(BaseModel):
+    dataset_id: int
+    source_id: str | None = None
+    batch_id: str | None = None
+    question_type: str | None = None
+    q_preview: str
+    assigned_to: str | None = None  # 배정된 검수자 코드(None=잔여)
+
+
+class ReservedOverview(BaseModel):
+    batches: list[ReservedBatch]
+    items: list[ReservedItem]
+
+
+class ReservedUploadResponse(BaseModel):
+    batch_id: str
+    added: int
+    remaining: int
+
+
 class RejectedItem(BaseModel):
     task_id: uuid.UUID
     reviewer_code: str | None
