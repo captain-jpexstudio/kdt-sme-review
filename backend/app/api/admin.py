@@ -9,7 +9,7 @@ from io import BytesIO
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, delete as sa_delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
@@ -22,8 +22,10 @@ from app.schemas.admin import (
     AdminTaskDiff,
     AdminTaskItem,
     AdminTaskList,
+    BatchInfo,
     DiffSide,
     RejectedItem,
+    ResetTasksResponse,
     ReservedBatch,
     ReservedItem,
     ReservedOverview,
@@ -425,6 +427,112 @@ async def final_pdf(
 def _q_preview(text: str, limit: int = 80) -> str:
     s = " ".join((text or "").split())
     return s if len(s) <= limit else s[: limit - 1] + "…"
+
+
+def _batch_started_expr():
+    """배치에 작업 이력이 있는지 — pending 외 상태이거나 임시저장/수정본이 있으면 착수로 본다."""
+    return or_(Task.status != "pending", Task.draft_a.isnot(None), Task.draft_q.isnot(None), Task.modified_a.isnot(None))
+
+
+@router.get("/batches", response_model=list[BatchInfo])
+async def batches(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):  # noqa: ARG001
+    rows = (
+        await db.execute(
+            select(Dataset.batch_id, Dataset.status, func.count()).group_by(Dataset.batch_id, Dataset.status).order_by(Dataset.batch_id)
+        )
+    ).all()
+    per: dict[str | None, dict[str, int]] = {}
+    for bid, st, cnt in rows:
+        b = per.setdefault(bid, {"main": 0, "reserved": 0})
+        b[st] = b.get(st, 0) + cnt
+    out: list[BatchInfo] = []
+    for bid, v in per.items():
+        task_count = (
+            await db.execute(
+                select(func.count()).select_from(Task).join(Dataset, Dataset.id == Task.dataset_id).where(Dataset.batch_id == bid)
+            )
+        ).scalar_one()
+        started = (
+            await db.execute(
+                select(Task.id).join(Dataset, Dataset.id == Task.dataset_id)
+                .where(Dataset.batch_id == bid, _batch_started_expr()).limit(1)
+            )
+        ).scalar_one_or_none() is not None
+        out.append(BatchInfo(batch_id=bid, main=v.get("main", 0), reserved=v.get("reserved", 0), tasks=task_count, started=started))
+    return out
+
+
+@router.delete("/batches/{batch_id}")
+async def delete_batch(
+    batch_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """미착수 배치 삭제 — 이중 업로드 사고 복구용. 작업 이력이 하나라도 있으면 409."""
+    ds_ids = (await db.execute(select(Dataset.id).where(Dataset.batch_id == batch_id))).scalars().all()
+    if not ds_ids:
+        raise HTTPException(404, {"error_code": "NOT_FOUND", "message": "존재하지 않는 batch_id입니다."})
+    started = (
+        await db.execute(
+            select(Task.id).where(Task.dataset_id.in_(ds_ids), _batch_started_expr()).limit(1)
+        )
+    ).scalar_one_or_none()
+    if started is not None:
+        raise HTTPException(409, {"error_code": "BATCH_STARTED", "message": "이미 검수가 시작된 배치는 삭제할 수 없습니다."})
+    deleted_tasks = (await db.execute(sa_delete(Task).where(Task.dataset_id.in_(ds_ids)))).rowcount
+    deleted_datasets = (await db.execute(sa_delete(Dataset).where(Dataset.batch_id == batch_id))).rowcount
+    db.add(AuditLog(user_id=admin.id, action_type="BATCH_DELETE", details={"batch_id": batch_id, "datasets": deleted_datasets, "tasks": deleted_tasks}))
+    await db.commit()
+    return {"ok": True, "datasets": deleted_datasets, "tasks": deleted_tasks}
+
+
+@router.post("/users/{user_id}/reset-tasks", response_model=ResetTasksResponse)
+async def reset_reviewer_tasks(
+    user_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """검수자 작업 리셋 — 모든 문항을 최초 배정 상태(pending·무편집)로. 폐기 대체분(예비)은 회수, 잠금 해제.
+    서명·동의·감사 기록은 보존(append-only)."""
+    user = await db.get(User, user_id)
+    if user is None or user.role != "reviewer":
+        raise HTTPException(404, {"error_code": "NOT_FOUND"})
+
+    # 폐기 대체로 배정됐던 예비(reserved) 태스크는 삭제해 예비 풀로 회수
+    replacement_ids = (
+        await db.execute(
+            select(Task.id).join(Dataset, Dataset.id == Task.dataset_id)
+            .where(Task.user_id == user_id, Dataset.status == "reserved")
+        )
+    ).scalars().all()
+    removed = 0
+    if replacement_ids:
+        removed = (await db.execute(sa_delete(Task).where(Task.id.in_(replacement_ids)))).rowcount
+
+    tasks = (await db.execute(select(Task).where(Task.user_id == user_id))).scalars().all()
+    for t in tasks:
+        t.status = "pending"
+        t.draft_q = None
+        t.draft_a = None
+        t.modified_q = None
+        t.modified_a = None
+        t.error_reasons = None
+        t.error_note = None
+        t.submitted_at = None
+        t.last_accessed_at = None
+        t.version += 1
+    unlocked = user.is_batch_submitted
+    user.is_batch_submitted = False
+    user.batch_submitted_at = None
+    db.add(
+        AuditLog(
+            user_id=admin.id,
+            action_type="TASK_RESET",
+            details={"target_user_id": str(user_id), "reviewer_code": user.reviewer_code, "reset": len(tasks), "replacements_removed": removed, "unlocked": unlocked},
+        )
+    )
+    await db.commit()
+    return ResetTasksResponse(reset=len(tasks), replacements_removed=removed, unlocked=unlocked)
 
 
 @router.get("/reserved", response_model=ReservedOverview)

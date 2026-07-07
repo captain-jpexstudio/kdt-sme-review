@@ -92,6 +92,20 @@ class AdminTaskDiff(BaseModel):
     submitted_at: datetime | None = None
 
 
+class BatchInfo(BaseModel):
+    batch_id: str | None
+    main: int
+    reserved: int
+    tasks: int
+    started: bool  # 착수됨(작업 이력 존재) — 삭제 불가
+
+
+class ResetTasksResponse(BaseModel):
+    reset: int              # pending으로 초기화된 main 문항 수
+    replacements_removed: int  # 회수된 폐기 대체(예비) 태스크 수
+    unlocked: bool
+
+
 class ReservedBatch(BaseModel):
     batch_id: str | None
     total: int      # 업로드된 예비 전체
