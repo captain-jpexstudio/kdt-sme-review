@@ -6,6 +6,7 @@ import { c, radius, shadow } from "@/lib/theme";
 // PAGES가 초기화 시점에 참조하므로 상단 선언(TDZ 방지).
 const para: React.CSSProperties = { fontSize: 14, lineHeight: 1.8, color: c.sub, margin: 0 };
 const quote: React.CSSProperties = { fontSize: 14.5, fontWeight: 700, color: c.brandText, background: c.brandTint, borderRadius: radius.control, padding: "12px 14px", margin: "4px 0 0", lineHeight: 1.6 };
+const chatLink: React.CSSProperties = { color: c.brandText, fontWeight: 600, wordBreak: "break-all" };
 
 // 검수 착수 전 브리핑(수정사항 #4). 다중 페이지 → 마지막 '시작하기'.
 // /guide(검수 가이드) 페이지가 동일 콘텐츠를 문서형으로 재사용한다.
@@ -96,8 +97,17 @@ export const BRIEFING_PAGES: { title: string; body: React.ReactNode }[] = [
           모든 문항의 검수 및 제출이 완료되면 화면의 안내에 따라 자문료 지급을 위한 계좌 정보 및 필요 서류를 입력해 주시면
           행정 절차가 마무리됩니다.
         </Item>
+        <Item label="문의 채널 (카카오톡 오픈채팅)">
+          작업 중 문의 사항은 아래 오픈채팅방으로 연락해 주시기 바랍니다.
+          <br />
+          <a href="https://open.kakao.com/o/gq9DXZCi" target="_blank" rel="noreferrer" style={chatLink}>
+            https://open.kakao.com/o/gq9DXZCi
+          </a>
+          <br />
+          입장코드: <b>0708</b>
+        </Item>
         <p style={quote}>"위원님들의 정밀한 검수가 대한민국 미래 국방 AI의 신뢰성을 좌우합니다."</p>
-        <p style={para}>작업 중 문의 사항이 있으신 경우 언제든 운영사무국으로 연락해 주시기 바랍니다. 감사합니다.</p>
+        <p style={para}>감사합니다.</p>
       </>
     ),
   },
