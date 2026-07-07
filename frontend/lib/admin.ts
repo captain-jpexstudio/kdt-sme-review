@@ -110,6 +110,11 @@ export interface ResetTasksResult {
   unlocked: boolean;
 }
 
+export async function completeAllTasks(userId: string): Promise<{ completed: number }> {
+  const { data } = await api.post<{ completed: number }>(`/admin/users/${userId}/complete-all`);
+  return data;
+}
+
 export async function resetReviewerTasks(userId: string): Promise<ResetTasksResult> {
   const { data } = await api.post<ResetTasksResult>(`/admin/users/${userId}/reset-tasks`);
   return data;

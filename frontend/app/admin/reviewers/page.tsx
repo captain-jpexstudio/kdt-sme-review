@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   agreementPdfUrl,
+  completeAllTasks,
   finalPdfUrl,
   getReviewers,
   getReviewerSignatures,
@@ -59,6 +60,26 @@ export default function ReviewersPage() {
       await refresh();
     } catch {
       setError("잠금 해제에 실패했습니다.");
+    }
+  };
+
+  // 테스트용 일괄 완료 — 최종 제출→계좌 플로우 점검용. 복원은 작업 리셋.
+  const completeAll = async (r: ReviewerProgress) => {
+    const code = r.reviewer_code ?? r.username;
+    const ok = window.confirm(
+      `[테스트용] ${code}의 미완료 문항을 전부 완료 처리합니다.\n\n` +
+        "- 수정본이 없는 문항은 원본이 그대로 복사됩니다 (실검수 아님!)\n" +
+        "- 이후 검수자 화면에서 최종 제출·계좌 입력 플로우를 테스트할 수 있습니다\n" +
+        "- 되돌리려면 [작업 리셋]을 사용하세요\n\n진행할까요?",
+    );
+    if (!ok) return;
+    setError(null);
+    try {
+      const res = await completeAllTasks(r.user_id);
+      await refresh();
+      window.alert(`일괄 완료 처리: ${res.completed}건. 이제 ${code} 계정으로 최종 제출을 테스트하세요.`);
+    } catch {
+      setError("일괄 완료 처리에 실패했습니다.");
     }
   };
 
@@ -166,8 +187,11 @@ export default function ReviewersPage() {
                 <button onClick={() => unlock(cur.user_id)} disabled={!cur.locked} style={cur.locked ? S.unlockButton : S.disabledButton}>
                   <LockOpen size={15} /> 잠금 해제
                 </button>
+                <button onClick={() => completeAll(cur)} title="테스트용: 미완료 문항 전부 완료 처리(원본 복사). 복원은 작업 리셋" style={bulkButton}>
+                  <FileCheck size={14} /> 일괄 완료 (테스트)
+                </button>
                 <button onClick={() => reset(cur)} title="모든 문항을 최초 배정 상태로 초기화(복구 불가)" style={resetButton}>
-                  <RotateCcw size={14} /> 작업 리셋
+                  <RotateCcw size={14} /> 작업 리셋 (복원)
                 </button>
               </div>
 
@@ -224,6 +248,7 @@ const statValue: React.CSSProperties = { fontSize: 22, fontWeight: 700, letterSp
 const actionRow: React.CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", margin: "16px 0", paddingTop: 16, borderTop: `1px solid ${c.line}` };
 const sigWrap: React.CSSProperties = { paddingTop: 4 };
 const sigTitle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 700, color: c.ink, marginBottom: 10 };
-const resetButton: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, border: `1px solid ${c.dangerBorder}`, background: "#fff", color: c.danger, borderRadius: radius.control, padding: "7px 13px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginLeft: "auto" };
+const bulkButton: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, border: `1px solid ${c.warnBorder}`, background: c.warnBg, color: c.warnText, borderRadius: radius.control, padding: "7px 13px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginLeft: "auto" };
+const resetButton: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, border: `1px solid ${c.dangerBorder}`, background: "#fff", color: c.danger, borderRadius: radius.control, padding: "7px 13px", fontSize: 13, fontWeight: 600, cursor: "pointer" };
 const livePill: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: c.brandText, background: c.brandTint, border: `1px solid ${c.brandBorder}`, borderRadius: 999, padding: "2px 9px" };
 const lockPill: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: c.warnText, background: c.warnBg, border: `1px solid ${c.warnBorder}`, borderRadius: 999, padding: "2px 9px" };

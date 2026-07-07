@@ -22,6 +22,8 @@ const LABEL: Record<string, string> = {
   RESERVED_UPLOAD: "예비 보충",
   BATCH_DELETE: "배치 삭제",
   TASK_RESET: "작업 리셋",
+  TASK_BULK_COMPLETE: "일괄 완료(테스트)",
+  DATASET_REPLACE: "데이터셋 교체",
   EXPORT: "내보내기",
   PII_PURGE: "PII 파기",
 };
@@ -142,7 +144,7 @@ export default function EventsPage() {
   );
 }
 
-const ADMIN_ACTIONS = new Set(["DATASET_UPLOAD", "RESERVED_UPLOAD", "BATCH_DELETE", "BATCH_UNLOCK", "TASK_RESET", "RESTORE", "EXPORT", "PII_PURGE"]);
+const ADMIN_ACTIONS = new Set(["DATASET_UPLOAD", "RESERVED_UPLOAD", "BATCH_DELETE", "BATCH_UNLOCK", "TASK_RESET", "TASK_BULK_COMPLETE", "DATASET_REPLACE", "RESTORE", "EXPORT", "PII_PURGE"]);
 
 const chips: React.CSSProperties = { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 };
 const chip: React.CSSProperties = { fontSize: 12.5, fontWeight: 500, color: c.sub, background: "#fff", border: `1px solid ${c.line2}`, borderRadius: 999, padding: "5px 13px", cursor: "pointer" };
