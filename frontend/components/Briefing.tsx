@@ -8,7 +8,8 @@ const para: React.CSSProperties = { fontSize: 14, lineHeight: 1.8, color: c.sub,
 const quote: React.CSSProperties = { fontSize: 14.5, fontWeight: 700, color: c.brandText, background: c.brandTint, borderRadius: radius.control, padding: "12px 14px", margin: "4px 0 0", lineHeight: 1.6 };
 
 // 검수 착수 전 브리핑(수정사항 #4). 다중 페이지 → 마지막 '시작하기'.
-const PAGES: { title: string; body: React.ReactNode }[] = [
+// /guide(검수 가이드) 페이지가 동일 콘텐츠를 문서형으로 재사용한다.
+export const BRIEFING_PAGES: { title: string; body: React.ReactNode }[] = [
   {
     title: "국방 데이터셋 검수 브리핑",
     body: (
@@ -70,8 +71,13 @@ const PAGES: { title: string; body: React.ReactNode }[] = [
           <b> 최소 1단어 이상의 편집을 반드시 수행</b>하셔야 검수를 완료할 수 있습니다.
         </Item>
         <Item label="3단계 · 부적절 문항 처리 (불가/Reject)">
-          문항 자체의 오류가 심각해 활용이 불가능하다고 판단되는 경우, <b>[폐기(불가)]</b> 버튼을 누르고 사유를 간략히
-          기재해 주십시오. 해당 문항은 제외되며, 이를 대체할 새로운 예비(Reserved) 문항이 자동으로 배정됩니다.
+          본 문항들은 국방 데이터를 바탕으로 AI가 출제하였습니다. 만약 문항 자체의 오류가 심각해 활용이 불가능하다고
+          판단되는 경우, <b>[폐기(불가)]</b> 버튼을 누르고 사유를 간략히 기재해 주십시오. 해당 문항은 제외되며, 이를
+          대체할 새로운 예비(Reserved) 문항이 자동으로 배정됩니다.
+        </Item>
+        <Item label="4단계 · 문항 전처리 (필요시)">
+          AI 추출 과정에서 문항 내 오지선다가 포함된 경우, 수정 질문 내 텍스트 박스에서 오지선다 내용을 삭제하고, 실제
+          문제만 남길 수 있도록 수정해 주십시오.
         </Item>
       </>
     ),
@@ -108,16 +114,16 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
 
 export function Briefing({ onDone }: { onDone: () => void }) {
   const [page, setPage] = useState(0);
-  const last = page === PAGES.length - 1;
+  const last = page === BRIEFING_PAGES.length - 1;
   return (
     <div style={overlay}>
       <div style={modal}>
         <div style={head}>
           <span style={brand}>검수 브리핑</span>
-          <span style={counter}>{page + 1} / {PAGES.length}</span>
+          <span style={counter}>{page + 1} / {BRIEFING_PAGES.length}</span>
         </div>
-        <h2 style={title}>{PAGES[page].title}</h2>
-        <div style={content}>{PAGES[page].body}</div>
+        <h2 style={title}>{BRIEFING_PAGES[page].title}</h2>
+        <div style={content}>{BRIEFING_PAGES[page].body}</div>
         <div style={foot}>
           <button style={page === 0 ? ghostOff : ghost} onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
             이전
@@ -125,7 +131,7 @@ export function Briefing({ onDone }: { onDone: () => void }) {
           {last ? (
             <button style={primary} onClick={onDone}>시작하기</button>
           ) : (
-            <button style={primary} onClick={() => setPage((p) => Math.min(PAGES.length - 1, p + 1))}>다음 페이지</button>
+            <button style={primary} onClick={() => setPage((p) => Math.min(BRIEFING_PAGES.length - 1, p + 1))}>다음 페이지</button>
           )}
         </div>
       </div>
