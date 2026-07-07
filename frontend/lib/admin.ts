@@ -59,6 +59,33 @@ export async function uploadDataset(
   return data;
 }
 
+export interface AuditLogItem {
+  id: number;
+  action_type: string;
+  username: string | null;
+  reviewer_code: string | null;
+  role: string | null;
+  details: Record<string, unknown> | null;
+  client_ip: string | null;
+  created_at: string;
+}
+
+export interface AuditLogList {
+  items: AuditLogItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export async function getAuditLogs(opts: { actionType?: string; page?: number; pageSize?: number } = {}): Promise<AuditLogList> {
+  const params: Record<string, string | number> = {};
+  if (opts.actionType) params.action_type = opts.actionType;
+  if (opts.page) params.page = opts.page;
+  if (opts.pageSize) params.page_size = opts.pageSize;
+  const { data } = await api.get<AuditLogList>("/admin/audit", { params });
+  return data;
+}
+
 export interface BatchInfo {
   batch_id: string | null;
   main: number;
