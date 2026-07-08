@@ -27,6 +27,12 @@ def build_assignments(df: pd.DataFrame, reviewer_ids: list, per: int = 300, seed
     if "assigned_persona" in df.columns and df["assigned_persona"].notna().all():
         m = dict(zip(sorted(df["assigned_persona"].unique()), reviewer_ids))
         return [(i, m[df.at[i, "assigned_persona"]]) for i in range(n)]
+    # persona 없으면 solver(대상 특기) 기준 — 특기 수=검수자 수, 특기별 per건 균등일 때만
+    if "solver" in df.columns and df["solver"].notna().all():
+        counts = df["solver"].value_counts()
+        if len(counts) == len(reviewer_ids) and (counts == per).all():
+            m = dict(zip(sorted(counts.index), reviewer_ids))  # 특기 정렬순 ↔ reviewer_code 정렬순
+            return [(i, m[df.at[i, "solver"]]) for i in range(n)]
     idx = list(range(n))
     random.Random(seed).shuffle(idx)
     return [(i, reviewer_ids[k // per]) for k, i in enumerate(idx)]
