@@ -136,6 +136,7 @@ class ReservedItem(BaseModel):
     source_id: str | None = None
     batch_id: str | None = None
     question_type: str | None = None
+    solver: str | None = None  # 대상 특기 — 폐기 대체는 같은 특기끼리만
     q_preview: str
     assigned_to: str | None = None  # 배정된 검수자 코드(None=잔여)
 
@@ -143,6 +144,8 @@ class ReservedItem(BaseModel):
 class ReservedOverview(BaseModel):
     batches: list[ReservedBatch]
     items: list[ReservedItem]
+    # 특기별 잔여(미배정) — {solver: remaining}. 폐기 대체가 같은 특기로만 이뤄지므로 특기 단위 소진 감시용
+    solver_remaining: dict[str, int] = {}
 
 
 class ReservedUploadResponse(BaseModel):

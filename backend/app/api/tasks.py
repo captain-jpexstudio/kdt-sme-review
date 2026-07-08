@@ -389,12 +389,12 @@ async def reject(
     task.submitted_at = now
     task.version += 1
 
-    # 배정 안 된 예비 문항 조건(같은 batch, status=reserved, Task 없음)
+    # 배정 안 된 예비 문항 조건(같은 batch, 같은 특기(solver), status=reserved, Task 없음)
     unassigned = ~select(Task.id).where(Task.dataset_id == Dataset.id).exists()
     repl = (
         await db.execute(
             select(Dataset)
-            .where(Dataset.status == "reserved", Dataset.batch_id == ds.batch_id, unassigned)
+            .where(Dataset.status == "reserved", Dataset.batch_id == ds.batch_id, Dataset.solver == ds.solver, unassigned)
             .order_by(Dataset.id)
             .limit(1)
             .with_for_update(skip_locked=True)
@@ -410,7 +410,7 @@ async def reject(
     remaining = (
         await db.execute(
             select(func.count()).select_from(Dataset).where(
-                Dataset.status == "reserved", Dataset.batch_id == ds.batch_id, unassigned
+                Dataset.status == "reserved", Dataset.batch_id == ds.batch_id, Dataset.solver == ds.solver, unassigned
             )
         )
     ).scalar_one()

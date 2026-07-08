@@ -679,11 +679,16 @@ async def reserved_overview(
             source_id=d.source_id,
             batch_id=d.batch_id,
             question_type=d.question_type,
+            solver=d.solver,
             q_preview=_q_preview(d.original_q),
             assigned_to=code,
         )
         for d, code in rows
     ]
+    solver_remaining: dict[str, int] = {}
+    for it in items:
+        if not it.assigned_to:
+            solver_remaining[it.solver or "(특기 없음)"] = solver_remaining.get(it.solver or "(특기 없음)", 0) + 1
     # 배치 목록은 전체 데이터셋 기준 — 예비 0인 배치도 카드로 노출해 보충 가능하게.
     all_batches = (
         await db.execute(select(Dataset.batch_id).distinct().order_by(Dataset.batch_id))
@@ -698,7 +703,7 @@ async def reserved_overview(
         ReservedBatch(batch_id=bid, total=v["total"], assigned=v["assigned"], remaining=v["total"] - v["assigned"])
         for bid, v in per_batch.items()
     ]
-    return ReservedOverview(batches=batches, items=items)
+    return ReservedOverview(batches=batches, items=items, solver_remaining=solver_remaining)
 
 
 @router.post("/reserved/upload", response_model=ReservedUploadResponse)
