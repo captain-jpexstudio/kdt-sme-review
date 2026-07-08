@@ -140,9 +140,16 @@ function ReservedPanel({ reserved, onUploaded }: { reserved: ReservedOverview; o
         <button onClick={() => setShowItems((v) => !v)} style={S.linkButton}>{showItems ? "목록 접기" : "목록 보기"}</button>
       </div>
       <p style={reservedLead}>
-        문항이 폐기되면 같은 배치의 예비 풀에서 미배정 문항 1건이 해당 검수자에게 자동 배정됩니다. 잔여가 0이면
-        폐기 시 대체 없이 작업량만 줄어드니, 아래에서 xlsx로 보충하세요.
+        문항이 폐기되면 예비 풀에서 <b>같은 특기(solver)</b>의 미배정 문항 1건이 자동 대체 배정됩니다. 해당 특기의
+        잔여가 0이면 대체 없이 작업량만 줄어드니, 특기별 잔여를 확인하고 xlsx로 보충하세요.
       </p>
+      {Object.keys(reserved.solver_remaining).length > 0 && (
+        <div style={solverChips}>
+          {Object.entries(reserved.solver_remaining).sort(([a], [b]) => a.localeCompare(b)).map(([solver, n]) => (
+            <span key={solver} style={n > 0 ? solverChip : solverChipEmpty}>{solver} <b>{n}</b></span>
+          ))}
+        </div>
+      )}
       <input ref={fileRef} type="file" accept=".xlsx,.xlsm" onChange={onFile} style={{ display: "none" }} />
       {reserved.batches.length === 0 && <div style={S.empty}>업로드된 예비 문항이 없습니다. 데이터셋 업로드 시 status=reserved 행이 예비 풀로 들어갑니다.</div>}
       <div style={batchGrid}>
@@ -168,6 +175,7 @@ function ReservedPanel({ reserved, onUploaded }: { reserved: ReservedOverview; o
             <thead>
               <tr>
                 <th style={th}>문항번호</th>
+                <th style={th}>특기</th>
                 <th style={th}>유형</th>
                 <th style={th}>질문</th>
                 <th style={th}>상태</th>
@@ -177,6 +185,7 @@ function ReservedPanel({ reserved, onUploaded }: { reserved: ReservedOverview; o
               {reserved.items.map((it) => (
                 <tr key={it.dataset_id}>
                   <td style={tdMono}>{it.source_id ?? `#${it.dataset_id}`}</td>
+                  <td style={td}>{it.solver ?? "-"}</td>
                   <td style={td}>{it.question_type ?? "-"}</td>
                   <td style={tdQ}>{it.q_preview}</td>
                   <td style={td}>
@@ -195,6 +204,9 @@ function ReservedPanel({ reserved, onUploaded }: { reserved: ReservedOverview; o
 }
 
 const reservedLead: React.CSSProperties = { margin: "0 0 14px", fontSize: 13, color: c.sub, lineHeight: 1.7 };
+const solverChips: React.CSSProperties = { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 };
+const solverChip: React.CSSProperties = { fontSize: 12, fontWeight: 500, color: c.brandText, background: c.brandTint, border: `1px solid ${c.brandBorder}`, borderRadius: 999, padding: "3px 11px" };
+const solverChipEmpty: React.CSSProperties = { ...solverChip, color: c.danger, background: c.dangerBg, borderColor: c.dangerBorder };
 const batchGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 10 };
 const batchCard: React.CSSProperties = { border: `1px solid ${c.line}`, borderRadius: radius.control, background: c.soft, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" };
 const batchCardWarn: React.CSSProperties = { ...batchCard, background: c.dangerBg, borderColor: c.dangerBorder };

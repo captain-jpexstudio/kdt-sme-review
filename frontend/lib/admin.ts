@@ -155,6 +155,7 @@ export interface ReservedItem {
   source_id: string | null;
   batch_id: string | null;
   question_type: string | null;
+  solver: string | null;
   q_preview: string;
   assigned_to: string | null;
 }
@@ -162,6 +163,7 @@ export interface ReservedItem {
 export interface ReservedOverview {
   batches: ReservedBatch[];
   items: ReservedItem[];
+  solver_remaining: Record<string, number>;
 }
 
 export async function getReserved(batchId?: string): Promise<ReservedOverview> {
