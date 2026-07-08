@@ -70,6 +70,7 @@ export interface BatchEligibility {
   total: number;
   eligible: boolean;
   locked: boolean;
+  payment_saved: boolean;
 }
 
 export interface BatchSubmitPayload {

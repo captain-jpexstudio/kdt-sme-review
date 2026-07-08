@@ -208,11 +208,21 @@ async def batch_eligibility(
     db: AsyncSession = Depends(get_db),
 ):
     completed, total = await _completion_counts(db, user)
+    payment_saved = (
+        await db.execute(
+            select(PaymentInfo.user_id).where(
+                PaymentInfo.user_id == user.id,
+                PaymentInfo.purged.is_(False),
+                PaymentInfo.bank_account_enc.isnot(None),
+            )
+        )
+    ).scalar_one_or_none() is not None
     return BatchEligibility(
         completed=completed,
         total=total,
         eligible=total > 0 and completed == total and not user.is_batch_submitted,
         locked=user.is_batch_submitted,
+        payment_saved=payment_saved,
     )
 
 

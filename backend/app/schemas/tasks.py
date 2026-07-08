@@ -107,6 +107,7 @@ class BatchEligibility(BaseModel):
     total: int
     eligible: bool
     locked: bool
+    payment_saved: bool = False  # 자문료 계좌 등록 여부 — 잠금 후 미등록이면 계좌 모달 재표시
 
 
 class BatchSubmitRequest(BaseModel):

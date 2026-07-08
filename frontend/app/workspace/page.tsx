@@ -67,7 +67,7 @@ export default function WorkspacePage() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
-  const [eligibility, setEligibility] = useState<BatchEligibility>({ completed: 0, total: 0, eligible: false, locked: false });
+  const [eligibility, setEligibility] = useState<BatchEligibility>({ completed: 0, total: 0, eligible: false, locked: false, payment_saved: false });
   const [finalOpen, setFinalOpen] = useState(false);
   const [finalSig, setFinalSig] = useState<SignatureValue | null>(null);
   const [finalBusy, setFinalBusy] = useState(false);
@@ -158,6 +158,9 @@ export default function WorkspacePage() {
         setItems(list);
         setEligibility(nextEligibility);
         setLocked(me.is_batch_submitted || nextEligibility.locked);
+        // 미완 단계 자동 안내 — 최종 서명 전이면 최종 제출 모달, 잠금 후 계좌 미등록이면 계좌 모달(완료까지 재표시)
+        if (nextEligibility.eligible) setFinalOpen(true);
+        else if (nextEligibility.locked && !nextEligibility.payment_saved) setPaymentOpen(true);
         const target = resumed?.task_id ?? currentId ?? list[0]?.task_id;
         if (target) await loadDetail(target);
       })
