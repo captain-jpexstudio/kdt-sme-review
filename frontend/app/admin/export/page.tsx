@@ -10,9 +10,9 @@ import { S, useAdminGuard } from "../ui";
 
 const COLUMNS = [
   ["reviewer_code", "검수자 가명 코드 (실명·PII 미포함)"],
-  ["batch_id · dataset_id", "배치 · 문항 식별자"],
-  ["capability_category · joint_domain · difficulty · question_type", "벤치마크 메타"],
-  ["original_q · original_a", "원본 질문·정답"],
+  ["batch_id · id", "배치 · 문항 id (원본 데이터셋 파일의 id와 동일 — 대조 키)"],
+  ["capability_category · joint_domain · solver · difficulty · question_type", "벤치마크 메타·대상 특기"],
+  ["original_q · choices · original_a", "원본 질문 · 객관식 선지(1: … 형식) · 원본 정답"],
   ["modified_q · modified_a", "검수자 수정본"],
   ["rationale_cot", "해설"],
   ["error_reasons · error_note", "오류 태깅·메모"],

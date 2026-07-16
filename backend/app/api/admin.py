@@ -362,7 +362,7 @@ async def export(
         select(
             User.reviewer_code,
             Dataset.batch_id,
-            Dataset.id,
+            Dataset.source_id,
             Dataset.original_q,
             Dataset.original_a,
             Task.modified_q,
@@ -375,27 +375,36 @@ async def export(
             Dataset.difficulty,
             Dataset.question_type,
             Dataset.rationale,
+            Dataset.choices,
+            Dataset.solver,
         )
         .join(Task, Task.user_id == User.id)
         .join(Dataset, Dataset.id == Task.dataset_id)
         .where(Task.status == "completed")
-        .order_by(User.reviewer_code, Dataset.id)
+        .order_by(User.reviewer_code, Dataset.source_id, Dataset.id)
     )
     if batch_id:
         stmt = stmt.where(Dataset.batch_id == batch_id)
     if locked_only:
         stmt = stmt.where(User.is_batch_submitted.is_(True))  # 최종 서명 제출(잠금)한 검수자 분만
     rows = (await db.execute(stmt)).all()
+    def fmt_choices(choices) -> str | None:
+        if not choices:
+            return None
+        return "\n".join(f"{i}: {str(ch).strip()}" for i, ch in enumerate(choices, 1))
+
     data = [
         {
             "reviewer_code": r[0],
             "batch_id": r[1],
-            "dataset_id": r[2],
+            "id": r[2],  # 원본 데이터셋의 문항 id(source_id) — 원본 파일과 대조 키
             "capability_category": r[10],
             "joint_domain": r[11],
+            "solver": r[16],
             "difficulty": r[12],
             "question_type": r[13],
             "original_q": r[3],
+            "choices": fmt_choices(r[15]),
             "original_a": r[4],
             "modified_q": r[5],
             "modified_a": r[6],
